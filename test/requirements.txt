@@ -22,7 +22,7 @@ pytest-html==4.1.1
 pytest-json-report==1.5.0
 
 # 基础依赖（继承主项目）
-flask==2.2.3
+flask==2.2.5
 flask_restful==0.3.9
 flask-jwt-extended==4.5.3
 Werkzeug==2.2.2
