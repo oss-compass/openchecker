@@ -80,7 +80,9 @@ do
         continue
     fi
 
-    local file_type=$(file --mime-type -b "$1")
+    # 用当前遍历的文件判断类型；此前误用 $1（脚本的位置参数，即仓库 URL），
+    # 导致压缩包永远走不到 check_compressed_binary 分支
+    file_type=$(file --mime-type -b "$file")
     if [[ $file_type == application/zip || $file_type == application/x-tar || $file_type == application/gzip || $file_type == application/x-bzip2 ]]; then
         if check_compressed_binary "$file"; then
             echo "Binary archive found: $file"
