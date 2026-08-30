@@ -167,7 +167,27 @@ def init():
         logger.error(f"Application initialization failed: {str(e)}", exc_info=True)
         raise
 
+# 已知的 JWT secret 默认/占位值：部署时若未替换，任何人都可以用公开的密钥
+# 伪造合法 JWT，完全绕过认证。启动时直接拒绝服务，避免带病上线。
+INSECURE_DEFAULT_SECRETS = {
+    "your_secret_key",
+    "your_secure_secret_key_here",
+    "changeme",
+    "secret",
+}
+
+def ensure_secure_jwt_secret(secret_key: str) -> None:
+    """拒绝以默认/空 JWT secret 启动服务"""
+    if not secret_key or not secret_key.strip() or secret_key.strip().lower() in INSECURE_DEFAULT_SECRETS:
+        logger.error(
+            "Refusing to start: [JWT] secret_key in config/config.ini is empty or a "
+            "known default value, which lets anyone forge valid tokens and bypass "
+            "authentication. Set a strong random secret and restart."
+        )
+        raise SystemExit(1)
+
 if __name__ == '__main__':
+    ensure_secure_jwt_secret(secret_key)
     init()
 
     server_config = read_config('config/config.ini', "OpenCheck")
