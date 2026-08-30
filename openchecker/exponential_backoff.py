@@ -58,8 +58,17 @@ def retry_with_exponential_backoff(
  
     return wrapper
     
+# 外呼请求超时：agent 的消费线程池只有 1 个 worker（max_workers=1）且 prefetch_count=1，
+# 回调 POST 或 LLM 调用一旦挂起，整个 agent 将停止处理所有后续任务。
+# requests.post 默认无超时（可能无限挂起），必须显式设置。
+HTTP_CONNECT_TIMEOUT_S = 10
+HTTP_READ_TIMEOUT_S = 60
+LLM_TIMEOUT_S = 120
+
 @retry_with_exponential_backoff
 def post_with_backoff(**kwargs):
+    # 允许调用方显式传入 timeout 覆盖默认值
+    kwargs.setdefault('timeout', (HTTP_CONNECT_TIMEOUT_S, HTTP_READ_TIMEOUT_S))
     return requests.post(**kwargs)
 
 @retry_with_exponential_backoff
@@ -68,7 +77,8 @@ def completion_with_backoff(**kwargs):
 
     client = OpenAI(
         api_key = chatbot_config["api_key"],
-        base_url = chatbot_config["base_url"]
+        base_url = chatbot_config["base_url"],
+        timeout = LLM_TIMEOUT_S
     )
 
     # chat_completion = client.chat.completions.create(model=model, messages=messages)
