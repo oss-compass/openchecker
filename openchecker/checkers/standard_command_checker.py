@@ -10,6 +10,7 @@ from logger import get_logger
 from aksk.default_request import DefaultRequest
 from helper import read_config
 from aksk.signer import Signer
+from common import get_project_dir_name
 from platform_adapter import platform_manager
 
 logger = get_logger('openchecker.checkers.standard_command_checker')
@@ -114,7 +115,7 @@ def get_code_count(project_url: str) -> Tuple[Dict, str]:
     Returns:
         Tuple[Dict, str]: (result, error)
     """
-    project_name = os.path.basename(project_url).replace('.git', '')
+    project_name = get_project_dir_name(project_url)
 
     if not os.path.exists(project_name):
         subprocess.run(["git", "clone", project_url, "--depth=1"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -226,7 +227,7 @@ def get_ohpm_info(project_url: str) -> Tuple[Dict, str]:
         config = read_config(config_file)
         access_key = config["AKSK"].get("access_key", "")
         secret_key = config["AKSK"].get("secret_key", "")
-        project_url = project_url.replace('.git', '')
+        project_url = re.sub(r'\.git$', '', project_url)
         path = '/ohpm/m2m/package/info'
         body = json.dumps({
             "repoAddress": project_url,
@@ -277,7 +278,7 @@ def get_type_countries(project_url, type) -> Tuple[Dict, str]:
     """
     try:
         if "github.com" in project_url:
-            project_url = project_url.replace('.git', '')
+            project_url = re.sub(r'\.git$', '', project_url)
             owner_name, repo_name = platform_manager.parse_project_url(project_url)
             url = f'https://api.ossinsight.io/v1/repos/{owner_name}/{repo_name}/{type}/countries/'
             response = requests.get(url)
@@ -309,7 +310,7 @@ def get_type_organizations(project_url, type)  -> Tuple[Dict, str]:
     """
     try:
         if "github.com" in project_url:           
-            project_url = project_url.replace('.git', '')
+            project_url = re.sub(r'\.git$', '', project_url)
             owner_name, repo_name = platform_manager.parse_project_url(project_url)
             url = f'https://api.ossinsight.io/v1/repos/{owner_name}/{repo_name}/{type}/organizations/'
             response = requests.get(url)
@@ -344,7 +345,7 @@ def get_eol_info(project_url: str) -> Tuple[Dict, str]:
         with open(file_path, 'r', encoding='utf-8') as file:
             data = yaml.safe_load(file)
         eol_list = data.get("EOL LIST", {})
-        project_url = project_url.replace('.git', '')
+        project_url = re.sub(r'\.git$', '', project_url)
         for item in eol_list:
             if item['identifier'] == project_url:
                 eol_status = item['eol']

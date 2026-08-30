@@ -1,6 +1,6 @@
 import os
 from typing import Dict, List, Tuple
-from common import shell_exec
+from common import shell_exec, get_project_dir_name
 from logger import get_logger
 
 logger = get_logger('openchecker.checkers.binary_checker')
@@ -19,7 +19,10 @@ def binary_checker(project_url: str, res_payload: dict) -> None:
         project_root = os.path.dirname(os.path.dirname(file_dir))
         binary_checker_script = os.path.join(project_root, "scripts", "binary_checker.sh")
 
-        result, error = shell_exec(binary_checker_script, project_url)
+        result, error = shell_exec(
+            binary_checker_script,
+            f"{project_url} {get_project_dir_name(project_url)}"
+        )
         if error is None:
             logger.info(f"binary-checker job done: {project_url}")
             # Process special output format of binary checker
