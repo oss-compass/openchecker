@@ -4,8 +4,10 @@ from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, creat
 from user_manager import authenticate, identity
 from datetime import timedelta
 import os
+from urllib.parse import urlparse
 from message_queue import test_rabbitmq_connection, create_queue, publish_message
 from helper import read_config
+from common import is_valid_project_url, is_valid_version_number, is_valid_commit_hash
 from logger import setup_logging, get_logger, log_performance
 import json
 import uuid
@@ -110,17 +112,48 @@ class OpenCheck(Resource):
     @jwt_required()
     @log_performance('openchecker.api')
     def post(self):
-        payload = request.get_json()
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return {"error": "Request body must be a JSON object"}, 400
 
-        #TODO  do request body check here.
+        missing_fields = [field for field in ("commands", "project_url", "callback_url") if field not in payload]
+        if missing_fields:
+            return {"error": f"Missing required fields: {', '.join(missing_fields)}"}, 400
+
+        commands = payload['commands']
+        if not isinstance(commands, list) or not all(isinstance(command, str) for command in commands):
+            return {"error": "'commands' must be a list of strings"}, 400
+
+        project_url = payload['project_url']
+        # project_url 等字段会被 agent 展开进 shell 脚本执行，入口处必须校验格式
+        if not is_valid_project_url(project_url):
+            return {"error": "Invalid project_url, expected https://(www.)?(github|gitee|gitcode).com/owner/repo"}, 400
+
+        callback_url = payload['callback_url']
+        if not isinstance(callback_url, str) or urlparse(callback_url).scheme not in ("http", "https"):
+            return {"error": "Invalid callback_url, expected an http(s) URL"}, 400
+
+        commit_hash = payload.get("commit_hash")
+        if commit_hash is not None and not is_valid_commit_hash(commit_hash):
+            return {"error": "Invalid commit_hash, expected a git commit hash (hex, 7-64 chars)"}, 400
+
+        task_metadata = payload.get("task_metadata")
+        if task_metadata is None:
+            task_metadata = {}
+        if not isinstance(task_metadata, dict):
+            return {"error": "'task_metadata' must be a JSON object"}, 400
+
+        version_number = task_metadata.get("version_number")
+        if version_number not in (None, "None") and not is_valid_version_number(str(version_number)):
+            return {"error": "Invalid version_number in task_metadata"}, 400
 
         message_body = {
-            "command_list": payload['commands'],
-            "project_url": payload['project_url'],
-            "commit_hash": payload.get("commit_hash"),
+            "command_list": commands,
+            "project_url": project_url,
+            "commit_hash": commit_hash,
             "access_token": payload.get("access_token"),
-            "callback_url": payload['callback_url'],
-            "task_metadata": payload['task_metadata']
+            "callback_url": callback_url,
+            "task_metadata": task_metadata
         }
 
         user_id = get_jwt_identity()
