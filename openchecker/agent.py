@@ -48,6 +48,7 @@ from checkers.token_permissions_checker import token_permissions_checker
 from checkers.url_checker import url_checker
 from checkers.webhooks_checker import webhooks_checker
 from common import shell_exec, is_valid_project_url, is_valid_version_number, is_valid_commit_hash, normalize_project_url
+from shlex import quote as shell_quote
 from constans import shell_script_handlers
 from exponential_backoff import post_with_backoff
 from helper import read_config
@@ -140,7 +141,8 @@ def ruby_licenses(data: Dict[str, Any]) -> Dict[str, Any]:
                 
             # If a valid GitHub address is found, clone the repository and call licensee
             if project_url:
-                shell_script = shell_script_handlers["license-detector"].format(project_url=project_url)
+                # vcs_url 来自被扫描仓库内容（ORT 输出），输入校验无法覆盖，必须转义
+                shell_script = shell_script_handlers["license-detector"].format(project_url=shell_quote(project_url))
                 result, error = shell_exec(shell_script)
                 
                 if error is None:
@@ -346,7 +348,7 @@ def _download_project_source(project_url: str, version_number: str) -> bool:
     """
     try:
         shell_script = shell_script_handlers["download-checkout"].format(
-            project_url=project_url, 
+            project_url=shell_quote(project_url),
             version_number=version_number
         )
         result, error = shell_exec(shell_script)
@@ -371,7 +373,7 @@ def _generate_lock_files(project_url: str) -> None:
         project_url: Project URL
     """
     try:
-        shell_script = shell_script_handlers["generate-lock_files"].format(project_url=project_url)
+        shell_script = shell_script_handlers["generate-lock_files"].format(project_url=shell_quote(project_url))
         result, error = shell_exec(shell_script)
         
         if error is None:
@@ -465,7 +467,7 @@ def _handle_shell_script_command(
             logger.error(f"No shell script handler found for command: {command}")
             return
         
-        shell_script = shell_script_handlers[command].format(project_url=project_url)
+        shell_script = shell_script_handlers[command].format(project_url=shell_quote(project_url))
         result, error = shell_exec(shell_script)
         
         if error is None:
@@ -522,7 +524,7 @@ def _cleanup_project_source(project_url: str) -> None:
         project_url: Project URL
     """
     try:
-        shell_script = shell_script_handlers["remove-source-code"].format(project_url=project_url)
+        shell_script = shell_script_handlers["remove-source-code"].format(project_url=shell_quote(project_url))
         result, error = shell_exec(shell_script)
         
         if error is None:
