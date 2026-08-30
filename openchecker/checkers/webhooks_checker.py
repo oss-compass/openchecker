@@ -22,7 +22,7 @@ def get_webhooks(project_url, access_token):
                 'Accept': 'application/vnd.github.v3+json',
                 'Authorization': f'token {access_token}'
             }
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, headers=headers, timeout=30)
             if response.status_code == 200:
                 hooks = response.json()
                 return hooks, None
@@ -40,7 +40,7 @@ def get_webhooks(project_url, access_token):
             headers = {
                 'Accept': 'application/json'
             }
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, headers=headers, timeout=30)
             if response.status_code == 200:
                 hooks = response.json()
                 return hooks, None

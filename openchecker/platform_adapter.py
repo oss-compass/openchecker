@@ -153,7 +153,7 @@ class GitHubAdapter(PlatformAdapter):
                 'Authorization': f'Bearer {self.access_token}'
             }
             
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, headers=headers, timeout=30)
             if response.status_code == 200:
                 repo_json = response.json()
                 return {
@@ -204,7 +204,7 @@ class GiteeAdapter(PlatformAdapter):
             url = f"https://gitee.com/api/v5/repos/{owner_name}/{repo_name}/releases"
             
             headers = {'Accept': 'application/json'}
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, headers=headers, timeout=30)
             
             if response.status_code == 200:
                 releases = response.json()
@@ -229,7 +229,7 @@ class GiteeAdapter(PlatformAdapter):
             owner_name, repo_name = self.parse_project_url(project_url)
             url = f"https://gitee.com/api/v5/repos/{owner_name}/{repo_name}?access_token={self.access_token}"
             
-            response = requests.get(url)
+            response = requests.get(url, timeout=30)
             if response.status_code == 200:
                 repo_json = response.json()
                 return {
@@ -280,7 +280,7 @@ class GitCodeAdapter(PlatformAdapter):
             url = f"https://api.gitcode.com/api/v5/repos/{owner_name}/{repo_name}/releases?access_token={self.access_token}"
             
             headers = {'Accept': 'application/json'}
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, headers=headers, timeout=30)
             
             if response.status_code == 200:
                 releases = response.json()
@@ -305,7 +305,7 @@ class GitCodeAdapter(PlatformAdapter):
             owner_name, repo_name = self.parse_project_url(project_url)
             url = f"https://api.gitcode.com/api/v5/repos/{owner_name}/{repo_name}?access_token={self.access_token}"
             
-            response = requests.get(url)
+            response = requests.get(url, timeout=30)
             if response.status_code == 200:
                 repo_json = response.json()
                 return {
@@ -326,7 +326,7 @@ class GitCodeAdapter(PlatformAdapter):
             owner_name, repo_name = self.parse_project_url(project_url)
             url = f"https://api.gitcode.com/api/v5/repos/{owner_name}/{repo_name}/download_statistics?access_token={self.access_token}"
             
-            response = requests.get(url)
+            response = requests.get(url, timeout=30)
             if response.status_code == 200:
                 down_json = response.json()
                 down_list = down_json.get('download_statistics_detail', [])

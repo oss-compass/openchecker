@@ -127,7 +127,7 @@ class Repository:
         if 'github.com' in url and _CACHED_GITHUB_TOKEN:
             headers = {'Authorization': f'token {_CACHED_GITHUB_TOKEN}'}
 
-        return requests.get(url, headers=headers)
+        return requests.get(url, headers=headers, timeout=30)
 
     @property
     def dependents_count(self):
