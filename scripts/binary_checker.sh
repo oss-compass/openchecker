@@ -1,5 +1,16 @@
 #!/bin/bash
 
+# 单个压缩包解压后允许落盘的最大字节数。
+# 本脚本处理的是被扫描仓库（不可信来源）中的压缩文件，gzip/zip/tar 炸弹
+# （如 <1MB 的 gz 解压出 GB 级内容）会在解压期间占满共享存储（repos_dir
+# 位于 NFS），使同盘上其它 agent 的写入全部失败。ulimit -f 以 1024 字节
+# 块为单位（bash 内建行为），超限时内核以 SIGXFSZ 终止写入进程。
+MAX_EXTRACT_BYTES=268435456
+MAX_EXTRACT_BLOCKS=$((MAX_EXTRACT_BYTES / 1024))
+# 条目数上限：海量小文件的炸弹不触发单文件大小限制，但会耗尽 inode/
+# 拖慢遍历（zipquine 类嵌套炸弹的外层也可能包含海量条目）
+MAX_ARCHIVE_ENTRIES=10000
+
 # Function to check if a file is binary
 is_binary() {
     if [[ $(file --mime-type -b "$1") == application* || $(file --mime-type -b "$1") == image* || $(file --mime-type -b "$1") == audio* || $(file --mime-type -b "$1") == video* ]]; then
@@ -15,15 +26,25 @@ check_compressed_binary() {
     local file_type=$(file --mime-type -b "$1")
 
     if [[ $file_type == application/zip ]]; then
-        unzip -qq -P "" "$1" -d "$temp_dir"
+        if [ "$(unzip -Z1 "$1" 2>/dev/null | wc -l)" -gt "$MAX_ARCHIVE_ENTRIES" ]; then
+            echo "Archive entry count exceeds limit ($MAX_ARCHIVE_ENTRIES), skipping: $1"
+            rm -rf "$temp_dir"
+            return 1
+        fi
+        ( ulimit -f "$MAX_EXTRACT_BLOCKS"; unzip -qq -P "" "$1" -d "$temp_dir" )
     elif [[ $file_type == application/x-tar ]]; then
-        tar -xf "$1" -C "$temp_dir"
+        if [ "$(tar -tf "$1" 2>/dev/null | wc -l)" -gt "$MAX_ARCHIVE_ENTRIES" ]; then
+            echo "Archive entry count exceeds limit ($MAX_ARCHIVE_ENTRIES), skipping: $1"
+            rm -rf "$temp_dir"
+            return 1
+        fi
+        ( ulimit -f "$MAX_EXTRACT_BLOCKS"; tar -xf "$1" -C "$temp_dir" )
     elif [[ $file_type == application/gzip ]]; then
-        gunzip -c "$1" > "$temp_dir/temp_file"
+        ( ulimit -f "$MAX_EXTRACT_BLOCKS"; gunzip -c "$1" > "$temp_dir/temp_file" )
         if [[ -f "$temp_dir/temp_file" ]]; then
             local inner_file_type=$(file --mime-type -b "$temp_dir/temp_file")
             if [[ $inner_file_type == application/x-tar ]]; then
-                tar -xf "$temp_dir/temp_file" -C "$temp_dir"
+                ( ulimit -f "$MAX_EXTRACT_BLOCKS"; tar -xf "$temp_dir/temp_file" -C "$temp_dir" )
             else
                 echo "Unsupported inner file type of gzip: $inner_file_type"
                 rm -rf "$temp_dir"
@@ -35,11 +56,11 @@ check_compressed_binary() {
             return 1
         fi
     elif [[ $file_type == application/x-bzip2 ]]; then
-        bunzip2 -c "$1" > "$temp_dir/temp_file"
+        ( ulimit -f "$MAX_EXTRACT_BLOCKS"; bunzip2 -c "$1" > "$temp_dir/temp_file" )
         if [[ -f "$temp_dir/temp_file" ]]; then
             local inner_file_type=$(file --mime-type -b "$temp_dir/temp_file")
             if [[ $inner_file_type == application/x-tar ]]; then
-                tar -xf "$temp_dir/temp_file" -C "$temp_dir"
+                ( ulimit -f "$MAX_EXTRACT_BLOCKS"; tar -xf "$temp_dir/temp_file" -C "$temp_dir" )
             else
                 echo "Unsupported inner file type of bzip2: $inner_file_type"
                 rm -rf "$temp_dir"
