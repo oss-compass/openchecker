@@ -47,7 +47,7 @@ from checkers.standard_command_checker import (
 from checkers.token_permissions_checker import token_permissions_checker
 from checkers.url_checker import url_checker
 from checkers.webhooks_checker import webhooks_checker
-from common import shell_exec
+from common import shell_exec, is_valid_project_url, is_valid_version_number, is_valid_commit_hash, normalize_project_url
 from constans import shell_script_handlers
 from exponential_backoff import post_with_backoff
 from helper import read_config
@@ -246,8 +246,26 @@ def callback_func(ch, method, properties, body):
         callback_url = message.get('callback_url')
         task_metadata = message.get('task_metadata', {})
         version_number = task_metadata.get("version_number", "None")
-        
-        project_url = project_url.replace(".git", "")
+
+        # 消息中的 project_url/version_number/commit_hash 会被展开进 shell 脚本执行
+        # （见 constans.py 的 shell_script_handlers），执行前必须校验，防止命令注入
+        if not is_valid_project_url(project_url):
+            logger.error(f"Invalid or missing project URL: {project_url}")
+            _handle_error_and_nack(ch, method, body, "Invalid or missing project URL")
+            return
+
+        project_url = normalize_project_url(project_url)
+
+        if commit_hash and not is_valid_commit_hash(commit_hash):
+            logger.error(f"Invalid commit hash: {commit_hash}")
+            _handle_error_and_nack(ch, method, body, "Invalid commit hash")
+            return
+
+        if version_number not in (None, "None") and not is_valid_version_number(str(version_number)):
+            logger.error(f"Invalid version number: {version_number}")
+            _handle_error_and_nack(ch, method, body, "Invalid version number")
+            return
+
         logger.info(
             f"Starting to process project: {project_url}",
             extra={
@@ -260,10 +278,6 @@ def callback_func(ch, method, properties, body):
                 }
             }
         )
-
-        if not project_url:
-            logger.error("Project URL is required")
-            return
 
         repos_dir = config.get("OpenCheck", {}).get("repos_dir", "/tmp/repos")
         logger.info(f"Repository directory: {repos_dir}")

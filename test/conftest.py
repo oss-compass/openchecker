@@ -19,6 +19,9 @@ import logging
 
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+# openchecker 包内模块使用顶层导入（如 from user_manager import ...），
+# 需要把包目录本身也加入 sys.path，否则 openchecker.* 模块无法被导入
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'openchecker'))
 
 # Mock the imports that might not be available during testing
 try:
