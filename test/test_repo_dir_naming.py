@@ -174,5 +174,27 @@ class TestBinaryCheckerScriptDirArg(unittest.TestCase):
         self.assertIn("Binary file found: github__owner__repo/lib.so", result.stdout)
 
 
+    def test_hostile_url_via_python_caller_is_inert(self):
+        """binary_checker.py 调用路径：敌意 URL 转义后不产生命令注入，
+        目录名参数同样转义（URL 在此分支可能未经 API 校验）"""
+        import tempfile
+        from common import get_project_dir_name
+
+        workdir = tempfile.mkdtemp(prefix="openchecker_binhostile_")
+        self.addCleanup(shutil.rmtree, workdir, ignore_errors=True)
+        cwd = os.getcwd()
+        os.chdir(workdir)
+        self.addCleanup(os.chdir, cwd)
+
+        from checkers.binary_checker import binary_checker
+        marker = os.path.join(workdir, "pwned_marker")
+        res_payload = {"scan_results": {}}
+        binary_checker(f"https://github.com/a/b; touch {marker}; true", res_payload)
+
+        self.assertFalse(os.path.exists(marker),
+                         "injection executed via binary_checker positional params")
+        self.assertIn("binary-checker", res_payload["scan_results"])
+
+
 if __name__ == '__main__':
     unittest.main()
