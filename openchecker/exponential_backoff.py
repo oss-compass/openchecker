@@ -62,7 +62,7 @@ def retry_with_exponential_backoff(
 # 回调 POST 或 LLM 调用一旦挂起，整个 agent 将停止处理所有后续任务。
 # requests.post 默认无超时（可能无限挂起），必须显式设置。
 HTTP_CONNECT_TIMEOUT_S = 10
-HTTP_READ_TIMEOUT_S = 60
+HTTP_READ_TIMEOUT_S = 30
 LLM_TIMEOUT_S = 120
 
 @retry_with_exponential_backoff
