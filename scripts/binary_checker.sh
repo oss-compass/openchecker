@@ -69,9 +69,12 @@ check_compressed_binary() {
 }
 
 # Main script
-project_name=$(basename $1 | sed 's/\.git$//') > /dev/null
+# $1 = 仓库 URL，$2 = 由 get_project_dir_name 派生的目录名（owner__repo），
+# 与 constans.py 中 download-checkout 创建的目录一致；basename 会在
+# 不同 owner 的同名仓库间碰撞（复用别人的目录，扫错代码）
+project_name="${2:-$(basename "$1" | sed 's/\.git$//')}"
 if [ ! -e "$project_name" ]; then
-    GIT_ASKPASS=/bin/true git clone --depth=1 $1 > /dev/null 2>&1
+    GIT_ASKPASS=/bin/true git clone --depth=1 "$1" "$project_name" > /dev/null 2>&1
 fi
 
 for file in $(find $project_name -type f -not -path '*/.git/*' -not -path '*/test/*')

@@ -3,7 +3,7 @@ import glob
 import re
 from typing import List, Dict, Tuple
 from constans import shell_script_handlers
-from common import shell_exec
+from common import shell_exec, get_project_dir_name
 from platform_adapter import platform_manager
 
 COMMAND = 'fuzzing-checker'
@@ -200,7 +200,8 @@ def fuzzing_checker(project_url: str, res_payload: dict) -> None:
     all_results.append(cfl_result)
     
     # 检测语言特定的模糊测试
-    shell_script = shell_script_handlers["languages-detector"].format(project_url=project_url)
+    shell_script = shell_script_handlers["languages-detector"].format(
+        project_url=project_url, project_dir_name=get_project_dir_name(project_url))
     result, error = shell_exec(shell_script)
     if error is None:
         languages = result

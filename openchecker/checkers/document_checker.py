@@ -2,6 +2,7 @@ import os
 import subprocess
 import json
 from typing import List, Tuple, Any
+from common import get_project_dir_name
 from exponential_backoff import completion_with_backoff
 from logger import get_logger
 
@@ -19,7 +20,7 @@ def check_doc_content(project_url: str, doc_type: str) -> Tuple[List[str], str]:
     Returns:
         Tuple[List[str], str]: (satisfied_doc_files, error_message)
     """
-    project_name = os.path.basename(project_url).replace('.git', '')
+    project_name = get_project_dir_name(project_url)
 
     if not os.path.exists(project_name):
         subprocess.run(["git", "clone", project_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -104,7 +105,7 @@ def check_readme_opensource(project_url: str) -> Tuple[bool, str]:
     Returns:
         Tuple[bool, str]: (is_valid, error_message)
     """
-    project_name = os.path.basename(project_url).replace('.git', '')
+    project_name = get_project_dir_name(project_url)
 
     if not os.path.exists(project_name):
         subprocess.run(["git", "clone", project_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

@@ -4,10 +4,10 @@ def _get_project_name(project_url):
 def _clone_project(project_url, depth=False):
     depth_flag = "--depth=1" if depth else ""
     return f"""if [ ! -e "$project_name" ]; then
-    GIT_ASKPASS=/bin/true git clone {depth_flag} {project_url} > /dev/null
+    GIT_ASKPASS=/bin/true git clone {depth_flag} {project_url} "$project_name" > /dev/null
 fi"""
 
-BASE_SCRIPT = _get_project_name("{project_url}") + "\n" + _clone_project("{project_url}")
+BASE_SCRIPT = 'project_name="{project_dir_name}"\n' + "\n" + _clone_project("{project_url}")
 
 download_checkout_shell_script = """
     """ + BASE_SCRIPT + """
@@ -35,7 +35,7 @@ generate_lock_files_shell_script = """
     """
 
 osv_scanner_shell_script = """
-    """ + _get_project_name("{project_url}") + """
+    """ + 'project_name="{project_dir_name}"\n' + """
     """ + _clone_project("{project_url}", depth=True) + """
 
     if [ -f "$project_name/oh-package-lock.json5" ] && [ ! -f "$project_name/package-lock.json" ]; then
@@ -52,7 +52,7 @@ osv_scanner_shell_script = """
     """
 
 scancode_shell_script = """
-    """ + _get_project_name("{project_url}") + """
+    """ + 'project_name="{project_dir_name}"\n' + """
     """ + _clone_project("{project_url}", depth=True) + """
     scancode -lc --json-pp scan_result.json $project_name --license-score 90 -n 4 > /dev/null
     cat scan_result.json
@@ -60,7 +60,7 @@ scancode_shell_script = """
     """
 
 sonar_scanner_shell_script = """
-    """ + _get_project_name("{project_url}") + """
+    """ + 'project_name="{project_dir_name}"\n' + """
     """ + _clone_project("{project_url}", depth=True) + """
     
     if [ ! -d "$project_name" ]; then
@@ -212,32 +212,32 @@ sonar_scanner_shell_script = """
     """
 
 dependency_checker_shell_script = """
-    """ + _get_project_name("{project_url}") + """
+    """ + 'project_name="{project_dir_name}"\n' + """
     """ + _clone_project("{project_url}", depth=True) + """
     ort -P ort.analyzer.allowDynamicVersions=true analyze -i $project_name -o $project_name -f JSON > /dev/null
     cat $project_name/analyzer-result.json
     """
 
 readme_checker_shell_script = """
-    """ + _get_project_name("{project_url}") + """
+    """ + 'project_name="{project_dir_name}"\n' + """
     """ + _clone_project("{project_url}", depth=True) + """
     find "$project_name" -type f \\( -name "README*" -o -name "docs/README*" \\) -print
     """
 
 maintainers_checker_shell_script = """
-    """ + _get_project_name("{project_url}") + """
+    """ + 'project_name="{project_dir_name}"\n' + """
     """ + _clone_project("{project_url}", depth=True) + """
     find "$project_name" -type f \\( -iname "MAINTAINERS*" -o -iname "COMMITTERS*" -o -iname "OWNERS*" -o -iname "CODEOWNERS*" \\) -print
     """
 
 languages_detector_shell_script = """
-    """ + _get_project_name("{project_url}") + """
+    """ + 'project_name="{project_dir_name}"\n' + """
     """ + _clone_project("{project_url}", depth=True) + """
     github-linguist $project_name --breakdown --json
     """
 
 oat_scanner_shell_script = """
-    """ + _get_project_name("{project_url}") + """
+    """ + 'project_name="{project_dir_name}"\n' + """
     """ + _clone_project("{project_url}", depth=True) + """                
     if [ ! -f "$project_name/OAT.xml" ]; then
         echo "OAT.xml not found in the project root directory."
@@ -249,14 +249,14 @@ oat_scanner_shell_script = """
     """
 
 remove_source_code_shell_script = """
-    """ + _get_project_name("{project_url}") + """
+    """ + 'project_name="{project_dir_name}"\n' + """
     if [ -e "$project_name" ]; then
         rm -rf $project_name > /dev/null
     fi
     """
 
 license_detector_shell_script = """
-    """ + _get_project_name("{project_url}") + """
+    """ + 'project_name="{project_dir_name}"\n' + """
     """ + _clone_project("{project_url}", depth=True) + """
     licensee detect "$project_name" --json
     rm -rf $project_name > /dev/null

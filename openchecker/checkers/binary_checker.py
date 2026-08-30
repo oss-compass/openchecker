@@ -1,6 +1,7 @@
 import os
 from typing import Dict, List, Tuple
-from common import shell_exec
+from common import shell_exec, get_project_dir_name
+from shlex import quote as shell_quote
 from logger import get_logger
 
 logger = get_logger('openchecker.checkers.binary_checker')
@@ -19,7 +20,12 @@ def binary_checker(project_url: str, res_payload: dict) -> None:
         project_root = os.path.dirname(os.path.dirname(file_dir))
         binary_checker_script = os.path.join(project_root, "scripts", "binary_checker.sh")
 
-        result, error = shell_exec(binary_checker_script, project_url)
+        # 两个位置参数（$1=URL, $2=目录名）都必须转义：project_url 在此分支
+        # 尚未经过 API 层校验，目录名也从 URL 派生
+        result, error = shell_exec(
+            binary_checker_script,
+            f"{shell_quote(project_url)} {shell_quote(get_project_dir_name(project_url))}"
+        )
         if error is None:
             logger.info(f"binary-checker job done: {project_url}")
             # Process special output format of binary checker

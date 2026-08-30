@@ -2,6 +2,7 @@ import os
 import subprocess
 from urllib.parse import urlparse
 from typing import List
+from common import get_project_dir_name
 from logger import get_logger
 
 logger = get_logger('openchecker.checkers.changed_files_checker')
@@ -23,7 +24,7 @@ def changed_files_detector(project_url: str, res_payload: dict, commit_hash: str
     
     context_path = os.getcwd()
     try:
-        repository_path = os.path.join(context_path, os.path.splitext(os.path.basename(urlparse(project_url).path))[0])
+        repository_path = os.path.join(context_path, get_project_dir_name(project_url))
         os.chdir(repository_path)
         logger.info(f"change os path to git repository directory: {repository_path}")
     except OSError as e:

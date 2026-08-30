@@ -5,7 +5,7 @@ import re
 import requests
 from typing import Dict, Tuple
 from constans import shell_script_handlers
-from common import shell_exec
+from common import shell_exec, get_project_dir_name
 from platform_adapter import platform_manager
 from logger import get_logger
 
@@ -85,7 +85,8 @@ def sonar_checker(project_url: str, res_payload: dict, config: dict) -> None:
             _create_sonar_project(sonar_project_name, sonar_config)
         
         shell_script = shell_script_handlers["sonar-scanner"].format(
-            project_url=project_url, 
+            project_url=project_url,
+            project_dir_name=get_project_dir_name(project_url), 
             sonar_project_name=sonar_project_name, 
             sonar_host=sonar_config.get('host', 'localhost'),
             sonar_port=sonar_config.get('port', '9000'),
