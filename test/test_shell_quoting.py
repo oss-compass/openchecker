@@ -75,6 +75,24 @@ class TestShellQuotingDefenseInDepth(unittest.TestCase):
                                 text=True, timeout=120)
         self.assertIn("Cloning into", result.stderr + result.stdout)
 
+    def test_binary_checker_positional_param_is_quoted(self):
+        """binary_checker.py 把 project_url 作为位置参数拼进脚本（$1），
+        必须与其他调用点一致地转义"""
+        from checkers.binary_checker import binary_checker
+
+        cwd = os.getcwd()
+        os.chdir(self.workdir)
+        self.addCleanup(os.chdir, cwd)
+        res_payload = {"scan_results": {}}
+        marker_in_workdir = os.path.join(self.workdir, "pwned_marker")
+
+        binary_checker(HOSTILE_URL.format(marker=marker_in_workdir), res_payload)
+
+        self.assertFalse(os.path.exists(marker_in_workdir),
+                         "injection executed via binary_checker positional param")
+        # 转义后 URL 作为单一参数到达脚本：clone 失败但返回结构完整
+        self.assertIn("binary-checker", res_payload["scan_results"])
+
     def test_ruby_licenses_repo_content_derived_url_is_quoted(self):
         """ruby_licenses 使用 ORT 输出（仓库内容）中的 vcs_url，
         该输入不受 API 校验保护，必须被转义后才能进入 shell"""
