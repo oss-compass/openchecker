@@ -143,7 +143,7 @@ def get_package_info(project_url: str) -> Tuple[Dict, str]:
     urlList = project_url.split("/")
     package_name = urlList[len(urlList) - 1]
     url = f"https://registry.npmjs.org/{package_name}"
-    response = requests.get(url)
+    response = requests.get(url, timeout=30)
     if response.status_code == 200:
         data = response.json()
         if 'github.com' in project_url:
@@ -164,7 +164,7 @@ def get_package_info(project_url: str) -> Tuple[Dict, str]:
             dependent_count = len(dependency)
         
         url_down = f"https://api.npmjs.org/downloads/range/last-month/{package_name}"
-        response_down = requests.get(url_down)
+        response_down = requests.get(url_down, timeout=30)
         if response_down.status_code == 200:
             down_data = response_down.json()
             last_month = down_data.get('downloads', [])
@@ -244,7 +244,7 @@ def get_ohpm_info(project_url: str) -> Tuple[Dict, str]:
         # sign the request
         authorization = Signer.sign(req)
         headers = {'authorization': authorization}
-        response = requests.request("post", "https://ohpm.openharmony.cn"+path, headers=headers, data=body)
+        response = requests.request("post", "https://ohpm.openharmony.cn"+path, headers=headers, data=body, timeout=30)
         if response.status_code == 200:
             repo_body = json.loads(response.text)
             repo_json = repo_body['body']
@@ -280,7 +280,7 @@ def get_type_countries(project_url, type) -> Tuple[Dict, str]:
             project_url = project_url.replace('.git', '')
             owner_name, repo_name = platform_manager.parse_project_url(project_url)
             url = f'https://api.ossinsight.io/v1/repos/{owner_name}/{repo_name}/{type}/countries/'
-            response = requests.get(url)
+            response = requests.get(url, timeout=30)
             if response.status_code == 200:
                 data_body = json.loads(response.text)
                 data_json = data_body['data']
@@ -312,7 +312,7 @@ def get_type_organizations(project_url, type)  -> Tuple[Dict, str]:
             project_url = project_url.replace('.git', '')
             owner_name, repo_name = platform_manager.parse_project_url(project_url)
             url = f'https://api.ossinsight.io/v1/repos/{owner_name}/{repo_name}/{type}/organizations/'
-            response = requests.get(url)
+            response = requests.get(url, timeout=30)
             if response.status_code == 200:
                 data_body = json.loads(response.text)
                 data_json = data_body['data']
