@@ -1,5 +1,4 @@
 import os
-import glob
 import re
 from typing import List, Dict, Tuple, Any
 from common import get_platform_type, list_workflow_files
@@ -30,19 +29,20 @@ def find_security_policy_files(repo_path: str, platform_type: str) -> List[str]:
         "doc/security.rst"
     ]
     
-    found_files = []
-    
+    found_files = set()
+
+    # glob 大小写敏感，upper() 只能匹配全大写文件名（如 SECURITY.MD），
+    # 匹配不到 SECURITY.md 等常见命名，这里改为按目录实际条目做大小写不敏感匹配
     for pattern in security_file_patterns:
-        full_pattern = os.path.join(repo_path, pattern)
-        
-        matches = glob.glob(full_pattern, recursive=True)
-        found_files.extend(matches)
-        
-        upper_pattern = os.path.join(repo_path, pattern.upper())
-        matches_upper = glob.glob(upper_pattern, recursive=True)
-        found_files.extend(matches_upper)
-        
-    return list(set(found_files))
+        sub_dir, file_name = os.path.split(pattern)
+        search_dir = os.path.join(repo_path, sub_dir) if sub_dir else repo_path
+        if not os.path.isdir(search_dir):
+            continue
+        for entry in os.listdir(search_dir):
+            if entry.lower() == file_name:
+                found_files.add(os.path.join(search_dir, entry))
+
+    return sorted(found_files)
 
 
 def analyze_security_policy_content(file_path: str) -> Dict:
@@ -67,9 +67,9 @@ def analyze_security_policy_content(file_path: str) -> Dict:
         }
     
     # 正则表达式模式（与Go版本保持一致）
-    url_pattern = r'(http|https)://[a-zA-Z0-9./?=_%:-]*'
+    url_pattern = r'(?:https?)://[a-zA-Z0-9./?=_%:-]*'
     email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,6}\b'
-    disclosure_pattern = r'(?i)(\b*[0-9]{1,4}\b|(Disclos|Vuln))'
+    disclosure_pattern = r'(?i)(\b[0-9]{1,4}\b|Disclos|Vuln)'
     
     # 提取信息
     urls = re.findall(url_pattern, content)
