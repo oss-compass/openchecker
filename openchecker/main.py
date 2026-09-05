@@ -3,6 +3,7 @@ from flask_restful import Resource, Api
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, create_access_token
 from user_manager import authenticate, identity
 from datetime import timedelta
+from werkzeug.exceptions import HTTPException
 import os
 from message_queue import test_rabbitmq_connection, create_queue, publish_message
 from helper import read_config
@@ -46,13 +47,14 @@ def auth():
         access_token = create_access_token(identity=user.id)
         return {"access_token": access_token, "token_type": "Bearer"}
     # try JSON body
-    data = request.get_json()
-    if data and 'username' in data and 'password' in data:
-        user = authenticate(data['username'], data['password'])
-        if not user:
-            return {"error": "Invalid credentials"}, 401
-        access_token = create_access_token(identity=user.id)
-        return {"access_token": access_token, "token_type": "Bearer"}
+    if request.data:
+        data = request.get_json()
+        if data and 'username' in data and 'password' in data:
+            user = authenticate(data['username'], data['password'])
+            if not user:
+                return {"error": "Invalid credentials"}, 401
+            access_token = create_access_token(identity=user.id)
+            return {"access_token": access_token, "token_type": "Bearer"}
     return {"error": "Missing credentials"}, 401
 
 config = read_config('config/config.ini', "RabbitMQ")
@@ -81,6 +83,10 @@ def after_request(response):
 @app.errorhandler(Exception)
 def handle_exception(e):
     """Global exception handler"""
+    # Let Flask keep its own status codes and pages for client errors
+    # (404 Not Found, 405 Method Not Allowed, 400 Bad Request, ...)
+    if isinstance(e, HTTPException):
+        return e
     logger.error(f"Unhandled exception: {str(e)}", exc_info=True)
     return {"error": "Internal Server Error"}, 500
 
