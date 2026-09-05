@@ -159,28 +159,34 @@ class TestSecurityPolicyChecker(unittest.TestCase):
         security_file = os.path.join(self.temp_dir, "security.md")
         security_content = """
         # Security Policy
-        
-        ## Reporting Security Vulnerabilities
-        
-        Please report security vulnerabilities to security@example.com
-        
+
+        ## Reporting a Vulnerability
+
+        Please report security vulnerabilities to security@example.com.
+        See https://example.com/security-policy for details.
+
         ## Supported Versions
-        
+
         We support the following versions:
         - 2.0.x
         - 1.9.x
         """
-        
+
         with open(security_file, 'w') as f:
             f.write(security_content)
-        
+
         # 执行测试
         result = security_policy_checker.analyze_security_policy_content(security_file)
-        
+
         # 验证结果
         self.assertIsInstance(result, dict)
-        self.assertIn("has_reporting_section", result)
-        self.assertIn("has_supported_versions", result)
+        self.assertEqual(result['file_size'], len(security_content))
+        self.assertIn('https://example.com/security-policy', result['urls'])
+        self.assertIn('security@example.com', result['emails'])
+        self.assertTrue(any(
+            keyword.lower().startswith('vuln')
+            for keyword in result['disclosure_keywords']
+        ))
 
 
 class TestTokenPermissionsChecker(unittest.TestCase):
