@@ -8,11 +8,13 @@ from platform_adapter import platform_manager
 COMMAND = 'sast-checker'
 
 # SAST工具正则表达式映射
+# uses 的真实格式为 owner/repo[/path]@ref（如 github/codeql-action/analyze@v3），
+# 模式不能以 $ 结尾，且 owner 前缀必须与实际 action 一致
 SAST_TOOL_PATTERNS = {
-    "codeql": r"^codeql-action/analyze$",
-    "snyk": r"^snyk/actions/.*",
-    "pysa": r"^facebook/pysa-action$",
-    "qodana": r"^JetBrains/qodana-action$",
+    "codeql": r"github/codeql-action/",
+    "snyk": r"snyk/actions/",
+    "pysa": r"facebook/pysa-action(?=@|$)",
+    "qodana": r"JetBrains/qodana-action(?=@|$)",
 }
 
 def _parse_workflow_for_sast_tools(workflow_content: str) -> List[str]:

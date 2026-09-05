@@ -74,9 +74,42 @@ class TestSASTChecker(unittest.TestCase):
                 env:
                   SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         """
-        
+
         detected_tools = sast_checker._parse_workflow_for_sast_tools(workflow_content)
         self.assertIn("snyk", detected_tools)
+
+    def test_parse_workflow_for_sast_tools_pysa_with_version(self):
+        """测试检测带版本号的Pysa工具"""
+        workflow_content = """
+        name: Security Analysis
+        jobs:
+          security:
+            steps:
+              - uses: facebook/pysa-action@v2
+        """
+
+        detected_tools = sast_checker._parse_workflow_for_sast_tools(workflow_content)
+        self.assertIn("pysa", detected_tools)
+
+    def test_parse_workflow_for_sast_tools_qodana_with_version(self):
+        """测试检测带版本号的Qodana工具"""
+        workflow_content = """
+        name: Security Analysis
+        jobs:
+          security:
+            steps:
+              - uses: JetBrains/qodana-action@v2
+        """
+
+        detected_tools = sast_checker._parse_workflow_for_sast_tools(workflow_content)
+        self.assertIn("qodana", detected_tools)
+
+    def test_parse_workflow_for_sast_tools_fallback_on_invalid_yaml(self):
+        """YAML解析失败时通过正则回退检测工具"""
+        invalid_yaml_with_codeql = "invalid: yaml: content: [\nuses: github/codeql-action/analyze@v3"
+
+        detected_tools = sast_checker._parse_workflow_for_sast_tools(invalid_yaml_with_codeql)
+        self.assertIn("codeql", detected_tools)
 
     def test_parse_workflow_invalid_yaml(self):
         """测试无效YAML处理"""
