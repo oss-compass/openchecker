@@ -179,9 +179,12 @@ def get_package_info(project_url: str) -> Tuple[Dict, str]:
                 "down_count": down_count, 
                 "day_enter": day_enter
             }, None
-        elif response.status_code == 404:
+        elif response_down.status_code == 404:
             logger.error("Failed to get down_count for package: {} \n Error: Not found".format(package_name))
             return {"description": False, "home_url": False, "dependent_count": False, "down_count": False, "day_enter": False}, "Not found"
+        else:
+            logger.error("Failed to get down_count for package: {} \n Error: HTTP {}".format(package_name, response_down.status_code))
+            return {"description": False, "home_url": False, "dependent_count": False, "down_count": False, "day_enter": False}, f"Failed to get download statistics: HTTP {response_down.status_code}"
     else:
         # Use platform adapter to get repo info
         try:
