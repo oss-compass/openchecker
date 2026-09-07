@@ -130,6 +130,7 @@ def check_readme_opensource(project_url: str) -> Tuple[bool, str]:
                         return True, None
                     else:
                         return False, "The README.OpenSource file exists and is not properly formatted."
+                return False, "The README.OpenSource file exists and is not properly formatted."
 
             except json.JSONDecodeError:
                 return False, "README.OpenSource is not properly formatted."
