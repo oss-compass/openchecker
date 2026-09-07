@@ -1,5 +1,6 @@
 import os
 import glob
+import json
 import re
 from typing import List, Dict, Tuple
 from constans import shell_script_handlers
@@ -202,11 +203,16 @@ def fuzzing_checker(project_url: str, res_payload: dict) -> None:
     # 检测语言特定的模糊测试
     shell_script = shell_script_handlers["languages-detector"].format(project_url=project_url)
     result, error = shell_exec(shell_script)
-    if error is None:
-        languages = result
-    else:
-        languages = []
-    languages = [lang.lower() for lang in languages]
+    languages = []
+    if error is None and result:
+        # shell_exec returns raw bytes; the languages-detector script prints
+        # github-linguist's JSON breakdown ({"language": [files...]}).
+        try:
+            detected = json.loads(result.decode('utf-8'))
+            if isinstance(detected, dict):
+                languages = [lang.lower() for lang in detected]
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            pass
     lang_results = check_language_fuzzing(repo_path, languages)
     all_results.extend(lang_results)
     
