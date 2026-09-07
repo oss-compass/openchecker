@@ -150,21 +150,22 @@ def check_signed_release(project_url: str) -> Tuple[Dict, str]:
     return {"is_released": bool(results), "signed_files": results}, None
 
 
-def _get_file_patterns(content_type: str) -> List[str]:
+def _get_file_patterns(content_type: str) -> List[Any]:
     """
     Get file matching patterns based on content type.
-    
+
     Args:
         content_type (str): Content type, "notes" or "sbom"
-        
+
     Returns:
-        list: List of file matching patterns
+        list: File matching patterns. Plain strings are matched against
+            the basename with exact equality, compiled patterns with re.match.
     """
     if content_type == "notes":
         return ["changelog", "releasenotes", "release_notes", "release", "release-notes"]
     elif content_type == "sbom":
         return [
-            r'(?i).+\.(cdx\.json|cdx\.xml|spdx|spdx\.json|spdx\.xml|spdx\.y[a?]ml|spdx\.rdf|spdx\.rdf\.xml)'
+            re.compile(r'(?i).+\.(cdx\.json|cdx\.xml|spdx|spdx\.json|spdx\.xml|spdx\.ya?ml|spdx\.rdf|spdx\.rdf\.xml)')
         ]
     else:
         return []
