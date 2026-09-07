@@ -34,16 +34,17 @@ def run_criticality_score(project_url: str) -> Tuple[Dict, str]:
             json_str = json_str.replace("\n", "")
             pattern = r'{.*?}'
             match = re.search(pattern, json_str)
-            json_res = {}
-            if match:
-                json_score = match.group()
-                try:
-                    json_res = json.loads(json_score)
-                    criticality_score = json_res['criticality_score']
-                except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse criticality score JSON: {e}")
-                    return None, "Failed to parse criticality score JSON."
-                return {"criticality_score": criticality_score}, None
+            if match is None:
+                logger.error("No criticality score JSON found in command output.")
+                return None, "Failed to parse criticality score JSON."
+            json_score = match.group()
+            try:
+                json_res = json.loads(json_score)
+                criticality_score = json_res['criticality_score']
+            except (json.JSONDecodeError, KeyError) as e:
+                logger.error(f"Failed to parse criticality score JSON: {e}")
+                return None, "Failed to parse criticality score JSON."
+            return {"criticality_score": criticality_score}, None
         else:
             logger.error(f"Criticality score command failed: {result.stderr}")
             return None, "Criticality score command failed."
