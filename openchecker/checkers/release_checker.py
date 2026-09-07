@@ -192,8 +192,10 @@ def _check_zip_contents(zip_url: str, file_patterns: List[str]) -> Tuple[List[st
     
     Args:
         zip_url (str): zip file download URL
-        file_patterns (list): List of file matching patterns
-        
+        file_patterns (list): File matching patterns. Plain strings are
+            matched as case-insensitive substrings of the basename,
+            compiled patterns with re.match.
+
     Returns:
         Tuple[List[str], str]: (found_files, error_msg)
             found_files: List of found files
@@ -203,20 +205,20 @@ def _check_zip_contents(zip_url: str, file_patterns: List[str]) -> Tuple[List[st
         response = requests.get(zip_url, timeout=30)
         if response.status_code != 200:
             return [], f"Failed to download release zip: {response.status_code}"
-        
+
         with zipfile.ZipFile(io.BytesIO(response.content), 'r') as zip_ref:
             found_files = []
             for file_pattern in file_patterns:
                 if isinstance(file_pattern, str):
                     for file_name in zip_ref.namelist():
                         base_name = os.path.basename(file_name).lower()
-                        if base_name == file_pattern.lower():
+                        if file_pattern.lower() in base_name and file_name not in found_files:
                             found_files.append(file_name)
                 else:
                     for file_name in zip_ref.namelist():
-                        if re.match(file_pattern, file_name):
+                        if re.match(file_pattern, file_name) and file_name not in found_files:
                             found_files.append(file_name)
-            
+
             return found_files, None
             
     except requests.exceptions.Timeout:
