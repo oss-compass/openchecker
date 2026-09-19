@@ -188,6 +188,20 @@ Common error types include:
 
 Sources: [openchecker/platform_adapter.py L353-L463](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/openchecker/platform_adapter.py#L353-L463)
 
+### Adapter Implementation Contract
+
+`PlatformAdapter` is an abstract base class built on `abc.ABC`. Every method that a concrete platform must provide is declared with `@abc.abstractmethod`, so an adapter that does not implement the complete interface cannot be instantiated at all. Python raises `TypeError` and names the missing methods during construction, which surfaces integration mistakes immediately instead of failing later inside a long-running queue consumer when the unimplemented method is first called.
+
+The contract that all adapters share:
+
+* `get_platform_name()` returns the platform identifier (`github`, `gitee`, `gitcode`) and must match the key used in `PlatformManager.adapters`.
+* `parse_project_url()` returns `(owner, repo)` and raises `ValueError` for URLs that do not belong to the platform.
+* `get_releases()`, `get_repo_info()` and `get_download_stats()` never raise; they return `(empty_result, error_message)` on failure so callers can degrade gracefully.
+* `get_zipball_url()` returns `None` when the URL is invalid or when the platform does not expose archive downloads.
+* Error messages are safe to log and persist and must never contain access tokens.
+
+Adding a new platform therefore means implementing all six abstract methods. An incomplete subclass fails fast at construction time, and the existing `PlatformManager` keeps working unchanged because the six method signatures are preserved.
+
 ## Configuration Requirements
 
 The platform adapters require access tokens configured in the system configuration file. Each platform section must include an `access_key` parameter for API authentication.
