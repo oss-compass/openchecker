@@ -5,6 +5,7 @@
 支持获取releases、仓库信息、下载统计等功能。
 """
 
+import abc
 import re
 import json
 from logger import get_logger
@@ -24,76 +25,108 @@ config_file = os.path.join(project_root, "config", "config.ini")
 config = read_config(config_file)
 
 
-class PlatformAdapter:
-    """平台适配器基类"""
-    
+class PlatformAdapter(abc.ABC):
+    """平台适配器抽象基类。
+
+    所有代码托管平台适配器（GitHub、Gitee、GitCode 等）都必须继承本类并实现
+    下面全部六个抽象方法。本类同时约定了适配器对上层暴露的统一契约：
+
+    * 查询类方法（``get_releases`` / ``get_repo_info`` / ``get_download_stats``）在遇到网络
+      异常、鉴权失败、资源不存在等情况时不得向上抛出异常，而应返回 ``(空结果, 错误信息)``
+      二元组，交由调用方决定降级处理还是记录告警。
+    * ``get_zipball_url`` 在 URL 非法或该平台不支持时返回 ``None``。
+    * ``parse_project_url`` 遇到非法 URL 时必须抛出 ``ValueError``，因为这属于调用方
+      参数错误，而不是可以静默恢复的运行时故障。
+    * 错误信息只用于日志与报告展示，禁止携带 access_key / token 等凭据。
+
+    这里使用 ``abc.ABC`` + ``@abc.abstractmethod`` 取代原先在每个方法体中直接
+    ``raise NotImplementedError`` 的写法：抽象基类会在实例化阶段就拒绝实现不完整的
+    子类（抛出 ``TypeError`` 并列出缺失的方法名），而旧写法只有在真正调用到未实现的
+    方法时才会暴露问题；对于常驻的队列消费者进程，这种延迟暴露往往意味着线上事故。
+    """
+
     def __init__(self, config: Dict[str, Any]):
+        """保存完整配置，具体适配器再从各自的分区读取 access_key。
+
+        Args:
+            config: 由 ``helper.read_config`` 解析出的完整配置字典。
+        """
         self.config = config
-        
+
+    @abc.abstractmethod
     def get_platform_name(self) -> str:
-        """获取平台名称"""
-        raise NotImplementedError
-        
+        """返回平台唯一标识。
+
+        返回值例如 ``"github"``、``"gitee"``、``"gitcode"``，必须与
+        ``PlatformManager.adapters`` 中的键保持一致，用于日志、报告与平台路由。
+
+        Returns:
+            str: 平台标识。
+        """
+
+    @abc.abstractmethod
     def parse_project_url(self, project_url: str) -> Tuple[str, str]:
-        """
-        解析项目URL，提取owner和repo名称
-        
+        """解析项目 URL，提取 owner 与 repo 名称。
+
         Args:
-            project_url: 项目URL
-            
+            project_url: 项目 URL，支持带或不带 ``.git`` 后缀、带或不带 ``www.`` 前缀的常见写法。
+
         Returns:
-            Tuple[str, str]: (owner_name, repo_name)
+            Tuple[str, str]: ``(owner_name, repo_name)``。
+
+        Raises:
+            ValueError: 当 URL 不属于当前平台或格式非法时抛出，调用方需据此判断项目地址是否有效。
         """
-        raise NotImplementedError
-        
+
+    @abc.abstractmethod
     def get_releases(self, project_url: str) -> Tuple[List[Dict], Optional[str]]:
-        """
-        获取项目所有releases
-        
+        """获取项目全部 release。
+
         Args:
-            project_url: 项目URL
-            
+            project_url: 项目 URL。
+
         Returns:
-            Tuple[List[Dict], Optional[str]]: (releases列表, 错误信息)
+            Tuple[List[Dict], Optional[str]]: ``(releases 列表, 错误信息)``。
+            成功时错误信息为 ``None``；失败时返回空列表并给出可读的错误原因，不向上抛出异常。
         """
-        raise NotImplementedError
-        
+
+    @abc.abstractmethod
     def get_zipball_url(self, project_url: str, tag: str) -> Optional[str]:
-        """
-        获取指定tag的zipball下载URL
-        
+        """获取指定 tag 的源码压缩包下载地址。
+
         Args:
-            project_url: 项目URL
-            tag: 标签名称
-            
+            project_url: 项目 URL。
+            tag: 标签或版本名称。
+
         Returns:
-            Optional[str]: zipball URL
+            Optional[str]: 下载 URL；URL 非法或该平台不支持时返回 ``None``。
         """
-        raise NotImplementedError
-        
+
+    @abc.abstractmethod
     def get_repo_info(self, project_url: str) -> Tuple[Dict, Optional[str]]:
-        """
-        获取仓库基本信息
-        
+        """获取仓库基本信息。
+
         Args:
-            project_url: 项目URL
-            
+            project_url: 项目 URL。
+
         Returns:
-            Tuple[Dict, Optional[str]]: (仓库信息, 错误信息)
+            Tuple[Dict, Optional[str]]: ``(仓库信息, 错误信息)``。仓库信息至少包含
+            ``homepage`` 与 ``description`` 两个键（缺失时以空字符串补齐）；失败时返回
+            空字典并给出错误原因，不向上抛出异常。
         """
-        raise NotImplementedError
-        
+
+    @abc.abstractmethod
     def get_download_stats(self, project_url: str) -> Tuple[Dict, Optional[str]]:
-        """
-        获取下载统计信息
-        
+        """获取下载统计信息。
+
         Args:
-            project_url: 项目URL
-            
+            project_url: 项目 URL。
+
         Returns:
-            Tuple[Dict, Optional[str]]: (下载统计, 错误信息)
+            Tuple[Dict, Optional[str]]: ``(下载统计, 错误信息)``。统计字典包含
+            ``download_count`` 与 ``period`` 两个键；对于不提供下载统计能力的平台（如
+            GitHub、Gitee），返回计数为 0 的空统计结果而非报错。
         """
-        raise NotImplementedError
 
 
 class GitHubAdapter(PlatformAdapter):
