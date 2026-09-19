@@ -13,6 +13,7 @@
 # limitations under the License.
 """Main python script for calculating OSS Criticality Score."""
 
+import abc
 import argparse
 import csv
 import datetime
@@ -20,6 +21,7 @@ import json
 import logging
 import math
 import os
+import re
 import sys
 import threading
 import time
@@ -55,72 +57,111 @@ PARAMS = [
 ]
 
 
-class Repository:
-    """General source repository."""
+class Repository(abc.ABC):
+    """General source repository.
+
+    ``Repository`` declares the signal contract that every hosting platform has
+    to fulfil.  ``GitHubRepository`` and ``GitLabRepository`` provide the
+    platform specific lookups, while the shared ``dependents_count`` heuristic
+    lives here because it only relies on ``url``.
+
+    The properties below are deliberately abstract.  A platform that cannot
+    provide one of the signals must be rejected while it is being constructed,
+    instead of failing much later while the stats are collected.  Failing early
+    also avoids the historical behaviour where the ``NotImplementedError`` was
+    raised inside a worker thread, silently swallowed, and finally reported as a
+    ``KeyError`` by ``get_repository_stats``.
+    """
+
     def __init__(self, repo):
         self._repo = repo
         self._last_commit = None
         self._created_since = None
 
+    def _missing_signal(self, signal):
+        """Raise the error shared by every unimplemented signal.
+
+        Keeping the message in one place guarantees that the failure always
+        names both the concrete class and the missing signal, which is what
+        makes it actionable when a new hosting platform is added.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement the '{signal}' signal")
+
     @property
+    @abc.abstractmethod
     def name(self):
-        raise NotImplementedError
+        self._missing_signal('name')
 
     @property
+    @abc.abstractmethod
     def url(self):
-        raise NotImplementedError
+        self._missing_signal('url')
 
     @property
+    @abc.abstractmethod
     def language(self):
-        raise NotImplementedError
+        self._missing_signal('language')
 
     @property
+    @abc.abstractmethod
     def description(self):
-        raise NotImplementedError
+        self._missing_signal('description')
 
     @property
+    @abc.abstractmethod
     def last_commit(self):
-        raise NotImplementedError
+        self._missing_signal('last_commit')
 
     @property
+    @abc.abstractmethod
     def created_since(self):
-        raise NotImplementedError
+        self._missing_signal('created_since')
 
     @property
+    @abc.abstractmethod
     def updated_since(self):
-        raise NotImplementedError
+        self._missing_signal('updated_since')
 
     @property
+    @abc.abstractmethod
     def contributor_count(self):
-        raise NotImplementedError
+        self._missing_signal('contributor_count')
 
     @property
+    @abc.abstractmethod
     def watchers_count(self):
-        raise NotImplementedError
+        self._missing_signal('watchers_count')
 
     @property
+    @abc.abstractmethod
     def org_count(self):
-        raise NotImplementedError
+        self._missing_signal('org_count')
 
     @property
+    @abc.abstractmethod
     def commit_frequency(self):
-        raise NotImplementedError
+        self._missing_signal('commit_frequency')
 
     @property
+    @abc.abstractmethod
     def recent_releases_count(self):
-        raise NotImplementedError
+        self._missing_signal('recent_releases_count')
 
     @property
+    @abc.abstractmethod
     def updated_issues_count(self):
-        raise NotImplementedError
+        self._missing_signal('updated_issues_count')
 
     @property
+    @abc.abstractmethod
     def closed_issues_count(self):
-        raise NotImplementedError
+        self._missing_signal('closed_issues_count')
 
     @property
+    @abc.abstractmethod
     def comment_frequency(self):
-        raise NotImplementedError
+        self._missing_signal('comment_frequency')
 
     def _request_url_with_auth_headers(self, url):
         headers = {}
@@ -346,6 +387,12 @@ class GitLabRepository(Repository):
         return (max(languages, key=languages.get)).lower()
 
     @property
+    def description(self):
+        # GitLab exposes the project description directly; it can be ``None``
+        # for projects that never set one, matching GitHub's behaviour.
+        return self._repo.description
+
+    @property
     def last_commit(self):
         if self._last_commit:
             return self._last_commit
@@ -375,6 +422,14 @@ class GitLabRepository(Repository):
     @property
     def contributor_count(self):
         return len(self._repo.repository_contributors(all=True))
+
+    @property
+    def watchers_count(self):
+        # GitLab has no dedicated watcher counter.  Stars are the closest
+        # equivalent to the GitHub watcher count that PyGithub reports (GitHub's
+        # ``watchers_count`` is backed by stargazers as well), so reuse it here
+        # to keep the two platforms comparable.
+        return self._repo.star_count
 
     @property
     def org_count(self):
@@ -445,24 +500,43 @@ def get_param_score(param, max_value, weight=1):
 
 
 def get_repository_stats(repo):
-    """Return repository stats by grabing the raw signal data from the repo."""
+    """Return repository stats by grabbing the raw signal data from the repo.
+
+    Every signal is fetched on its own worker thread so a slow hosting API does
+    not block the others.  Exceptions raised inside those threads used to be
+    swallowed by ``threading`` and only surfaced later as a ``KeyError`` when
+    the missing entry was copied into ``result_dict``.  Capturing them and
+    re-raising the first one turns a missing signal (for example one of the
+    abstract ``Repository`` properties) into the actionable error it should be,
+    while keeping the concurrent lookup behaviour unchanged.
+    """
     if not repo.last_commit:
         logger.error(f'Repo is empty: {repo.url}')
         return None
 
-    def _worker(repo, param, return_dict):
-        """worker function"""
-        return_dict[param] = getattr(repo, param)
+    def _worker(repo, param, return_dict, errors):
+        """Fetch one signal, recording any failure for the calling thread."""
+        try:
+            return_dict[param] = getattr(repo, param)
+        except Exception as exp:  # pylint: disable=broad-except
+            errors[param] = exp
 
     threads = []
     return_dict = {}
+    errors = {}
     for param in PARAMS:
         thread = threading.Thread(target=_worker,
-                                  args=(repo, param, return_dict))
+                                  args=(repo, param, return_dict, errors))
         thread.start()
         threads.append(thread)
     for thread in threads:
         thread.join()
+
+    if errors:
+        # Re-raise the first failure in PARAMS order so the reported error is
+        # deterministic even when several signals fail at the same time.
+        failed_param = next(param for param in PARAMS if param in errors)
+        raise errors[failed_param]
 
     # Guarantee insertion order.
     result_dict = {
