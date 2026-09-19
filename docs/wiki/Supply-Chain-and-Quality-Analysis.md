@@ -108,6 +108,30 @@ Sources: [openchecker/checkers/standard_command_checker.py L13-L49](https://gith
 
  [openchecker/criticality/run.py L479-L532](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/openchecker/criticality/run.py#L479-L532)
 
+### Repository Interface Contract
+
+`openchecker/criticality/run.py` replaces the installed `criticality_score`
+console script when the container image is built (`Dockerfile` copies it over
+`site-packages/criticality_score/run.py`), so it also owns the abstraction that
+maps a hosting platform onto the metrics above.
+
+`Repository` is an abstract base class (`abc.ABC`). Every signal a platform has
+to supply is declared as an abstract property, so an incomplete implementation
+is rejected while it is constructed instead of silently producing a partial
+result:
+
+- `GitHubRepository` wraps a PyGithub repository and implements every signal.
+- `GitLabRepository` wraps a python-gitlab project. GitLab has no watcher
+  counter, so `watchers_count` reuses the project `star_count`, and
+  `description` is taken from the project metadata.
+- `dependents_count` is implemented once on the base class because it only
+  needs `url`.
+
+`get_repository_stats` evaluates the signals concurrently. Failures raised by a
+signal are collected and the first one is re-raised, so a broken lookup reports
+its real error rather than the `KeyError` that used to appear when a metric
+never made it into the result dictionary.
+
 ### Scorecard Integration
 
 The `scorecard_score_checker` leverages the OSSF Scorecard project to evaluate security and maintenance practices:
