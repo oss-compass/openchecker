@@ -6,6 +6,7 @@ from datetime import timedelta
 import os
 from message_queue import test_rabbitmq_connection, create_queue, publish_message
 from helper import read_config
+from request_validator import RequestValidationError, validate_opencheck_payload
 from logger import setup_logging, get_logger, log_performance
 import json
 import uuid
@@ -110,37 +111,67 @@ class OpenCheck(Resource):
     @jwt_required()
     @log_performance('openchecker.api')
     def post(self):
-        payload = request.get_json()
+        # ``silent=True`` makes Flask return None for a missing body, a wrong
+        # content type or malformed JSON, so all of them can be answered with
+        # the same 400 response instead of a generic 500.
+        payload = request.get_json(silent=True)
 
-        #TODO  do request body check here.
+        try:
+            checked = validate_opencheck_payload(payload)
+        except RequestValidationError as e:
+            logger.warning("Rejected OpenCheck request: invalid request body",
+                           extra={'extra_fields': {'errors': e.errors}})
+            return {"error": "Invalid request body", "details": e.errors}, 400
+
+        # The task id ties the accepted HTTP response, the queue message and the
+        # callback payload together, which makes troubleshooting a single
+        # request much easier.
+        task_id = uuid.uuid4().hex
 
         message_body = {
-            "command_list": payload['commands'],
-            "project_url": payload['project_url'],
-            "commit_hash": payload.get("commit_hash"),
-            "access_token": payload.get("access_token"),
-            "callback_url": payload['callback_url'],
-            "task_metadata": payload['task_metadata']
+            "task_id": task_id,
+            "command_list": checked['commands'],
+            "project_url": checked['project_url'],
+            "commit_hash": checked['commit_hash'],
+            "access_token": checked['access_token'],
+            "callback_url": checked['callback_url'],
+            "task_metadata": checked['task_metadata']
         }
 
         user_id = get_jwt_identity()
         logger.info("Started processing OpenCheck request", 
                    extra={'extra_fields': {
+                       'task_id': task_id,
                        'user_id': user_id,
-                       'project_url': payload['project_url'],
-                       'commands': payload['commands'],
-                       'callback_url': payload['callback_url']
+                       'project_url': checked['project_url'],
+                       'commands': checked['commands'],
+                       'callback_url': checked['callback_url']
                    }})
 
         pub_res = publish_message(config, "opencheck", json.dumps(message_body))
 
+        if not pub_res:
+            # publish_message() returns False when the broker did not accept the
+            # message; answering with a 5xx lets the caller retry instead of
+            # waiting for a callback that is never going to arrive.
+            logger.error("Failed to publish OpenCheck message", 
+                       extra={'extra_fields': {
+                           'task_id': task_id,
+                           'project_url': checked['project_url']
+                       }})
+            return {"error": "Failed to publish the analysis request, please retry later."}, 500
+
         logger.info("OpenCheck message published to queue", 
                    extra={'extra_fields': {
+                       'task_id': task_id,
                        'publish_result': pub_res,
-                       'project_url': payload['project_url']
+                       'project_url': checked['project_url']
                    }})
 
-        return "Message received: {}, start check, the results would sent to callback_url you passed later.".format(message_body)
+        return {
+            "task_id": task_id,
+            "message": "Message received, start check, the results would sent to callback_url you passed later."
+        }
 
 
 api.add_resource(Test, '/test')

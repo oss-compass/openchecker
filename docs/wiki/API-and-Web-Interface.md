@@ -180,6 +180,28 @@ The endpoint transforms the request into a message body and publishes it to the 
 
  [openchecker/main.py L117-L124](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/openchecker/main.py#L117-L124)
 
+### Request Body Validation
+
+Every `/opencheck` body is validated by `openchecker/request_validator.py` before the message is published. A request that does not match the schema below is answered with `HTTP 400` and a list of every problem found, so a client can fix the whole payload in one round trip instead of parsing a generic `HTTP 500`:
+
+```json
+{
+  "error": "Invalid request body",
+  "details": ["'commands[0]' is not a supported checker: 'osv-scaner'."]
+}
+```
+
+| Field | Required | Rules |
+| --- | --- | --- |
+| `commands` | Yes | Non-empty array of at most 50 supported checker names; unknown names are rejected instead of being silently skipped by the agent, and duplicates are removed while keeping the order |
+| `project_url` | Yes | `http`/`https` URL of at most 2048 characters without whitespace or shell metacharacters, because the URL is interpolated into the clone scripts in `constans.py` |
+| `callback_url` | Yes | `http`/`https` URL of at most 2048 characters without whitespace or shell metacharacters |
+| `commit_hash` | No | 4 to 64 hexadecimal characters; an empty value is treated as "not provided" |
+| `access_token` | No | At most 512 characters without whitespace or control characters |
+| `task_metadata` | No | Object of at most 4096 characters when serialized and at most 3 levels deep; `version_number` is rendered into the checkout script, so it must look like a git tag or branch name (letters, digits, `.`, `_`, `+`, `-`) |
+
+Unknown fields are ignored so the endpoint stays forward compatible. The accepted request is published to the `opencheck` queue with the normalized fields plus a `task_id`, which is also returned to the caller; a publication the broker rejects is reported as `HTTP 500` so the caller knows the task was not queued.
+
 ### Test Endpoint
 
 The `/test` endpoint provides both GET and POST methods for validating JWT tokens and testing API connectivity. The GET method returns user information, while the POST method echoes back a message parameter.

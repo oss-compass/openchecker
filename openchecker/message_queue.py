@@ -67,6 +67,15 @@ def create_queue(config, queue_name, arguments={}):
     connection.close()
 
 def publish_message(config, queue_name, message_body):
+    """
+    Publish a message to a queue.
+
+    Returns:
+        True if the broker accepted the message, False otherwise. Callers such
+        as the /opencheck endpoint use the result to decide whether the task was
+        actually queued; the failure reason is logged here instead of being
+        returned, so a caller cannot mistake an error string for a success.
+    """
     credentials = pika.PlainCredentials(config['username'], config['password'])
     parameters = pika.ConnectionParameters(config['host'], int(config['port']), '/', credentials)
 
@@ -76,10 +85,10 @@ def publish_message(config, queue_name, message_body):
         channel.basic_publish(exchange='', routing_key=queue_name, body=message_body)
         connection.close()
         logger.info(f"Message published successfully")
-        return None
+        return True
     except Exception as e:
         logger.error(f"Message publishing failed: {e}")
-        return str(e)
+        return False
 
 def consumer(config, queue_name, callback_func):
     """
