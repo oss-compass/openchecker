@@ -15,7 +15,7 @@ import json
 import os
 import re
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 # Local imports
 from checkers.bestpractices_checker import bestpractices_checker
@@ -92,6 +92,29 @@ def env_set():
     logger.info(f"已从配置文件config.ini设置环境变量")
 
 env_set()
+
+def get_project_info(project_url: str) -> Tuple[str, str, str]:
+    """
+    Resolve the platform, owner and repository of a project URL.
+
+    The platform adapters are the single source of truth for URL parsing, so
+    the agent reuses them instead of duplicating the platform specific regexes.
+
+    Args:
+        project_url: Project URL
+
+    Returns:
+        Tuple[str, str, str]: (platform_name, owner_name, repo_name)
+
+    Raises:
+        ValueError: If the URL does not belong to a supported platform
+    """
+    adapter = platform_manager.get_adapter(project_url)
+    if adapter is None:
+        raise ValueError(f"Unsupported platform for URL: {project_url}")
+
+    owner_name, repo_name = platform_manager.parse_project_url(project_url)
+    return adapter.get_platform_name(), owner_name, repo_name
 
 def get_licenses_name(data: Dict[str, Any]) -> str:
     """
@@ -282,7 +305,10 @@ def callback_func(ch, method, properties, body):
             "scan_results": {}
         }
 
-        if not _download_project_source(project_url, version_number):
+        # The changed-files detector diffs against a commit inside the checkout,
+        # so it needs the git metadata that only the clone based download keeps.
+        require_vcs_metadata = 'changed-files-since-commit-detector' in command_list
+        if not _download_project_source(project_url, version_number, require_vcs_metadata):
             _handle_error_and_nack(ch, method, body, "Failed to download project source")
             return
 
@@ -319,31 +345,57 @@ def callback_func(ch, method, properties, body):
         _handle_error_and_nack(ch, method, body, str(e))
 
 
-def _download_project_source(project_url: str, version_number: str) -> bool:
+def _download_project_source(project_url: str, version_number: str, require_vcs_metadata: bool = False) -> bool:
     """
     Download project source code.
-    
+
+    Release archives are fetched through the platform adapters first because a
+    snapshot archive is much cheaper than cloning the whole repository. The
+    archive does not contain the git history, so the clone based
+    download-checkout script is kept both as the fallback and as the only path
+    for checkers that need the git metadata.
+
     Args:
         project_url: Project URL
         version_number: Version number
-        
+        require_vcs_metadata: Keep the git metadata, i.e. always clone
+
     Returns:
         Whether successful
     """
+    if not require_vcs_metadata:
+        try:
+            platform_name, owner_name, repo_name = get_project_info(project_url)
+            logger.info(f"Downloading source archive of {owner_name}/{repo_name} via {platform_name} adapter")
+        except Exception as e:
+            logger.warning(f"Unable to resolve platform for {project_url}: {e}")
+
+        try:
+            success, error = platform_manager.download_project_source(
+                project_url,
+                version_number=version_number
+            )
+            if success:
+                logger.info(f"Source code download completed: {project_url}")
+                return True
+            logger.warning(f"Source archive download unavailable for {project_url}: {error}, falling back to git clone")
+        except Exception as e:
+            logger.warning(f"Source archive download failed for {project_url}: {e}, falling back to git clone")
+
     try:
         shell_script = shell_script_handlers["download-checkout"].format(
-            project_url=project_url, 
+            project_url=project_url,
             version_number=version_number
         )
         result, error = shell_exec(shell_script)
-        
+
         if error is None:
             logger.info(f"Source code download completed: {project_url}")
             return True
         else:
             logger.error(f"Source code download failed: {project_url}, error: {error}")
             return False
-            
+
     except Exception as e:
         logger.error(f"Source code download exception: {e}")
         return False
@@ -602,5 +654,3 @@ def parse_oat_txt_to_json(txt: str) -> Dict[str, Any]:
 if __name__ == "__main__":
     consumer(config["RabbitMQ"], "opencheck", callback_func)
     logger.info('Agents server ended.')
-
-# TODO: Add an adapter for various code platforms, like github, gitee, gitcode, etc.
