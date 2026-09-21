@@ -102,7 +102,7 @@ sequenceDiagram
 
   RabbitMQ->>callback_func: "message body with project_url, command_list"
   callback_func->>callback_func: "json.loads(body.decode('utf-8'))"
-  callback_func->>Project Management: "_download_project_source(project_url, version_number)"
+  callback_func->>Project Management: "_download_project_source(project_url, version_number, require_vcs_metadata)"
   Project Management-->>callback_func: "download success/failure"
   loop ["for command in command_list"]
     callback_func->>Project Management: "_generate_lock_files(project_url)"
@@ -261,11 +261,25 @@ The agent manages project source code through a three-phase lifecycle: download,
 
 ### Download Phase
 
-The `_download_project_source` function uses the `download-checkout` shell script template to clone repositories and optionally checkout specific versions:
+The `_download_project_source` function resolves the hosting platform through the global `platform_manager` and asks the matching adapter for the release archive first, because a snapshot archive is cheaper than cloning the whole repository:
 
+```python
+platform_name, owner_name, repo_name = get_project_info(project_url)
+success, error = platform_manager.download_project_source(
+    project_url, version_number=version_number
+)
 ```
+
+The adapter downloads the archive into a temporary staging directory next to `dest_root`, extracts it while rejecting path traversal and symbolic link entries, and finally renames the extracted `<repo>/` root to `<repos_dir>/<repo_name>`, so every checker keeps looking at the same path as before.
+
+The archive does not contain `.git`, therefore the `download-checkout` shell script template is still required in two cases:
+
+* the request needs git metadata, for example `changed-files-since-commit-detector` runs `git diff` inside the checkout;
+* the adapter cannot serve the request, for example `version_number` is `"None"`, the platform is unsupported, or the download failed.
+
+```python
 shell_script = shell_script_handlers["download-checkout"].format(
-    project_url=project_url, 
+    project_url=project_url,
     version_number=version_number
 )
 result, error = shell_exec(shell_script)

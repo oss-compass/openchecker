@@ -7,7 +7,7 @@
 
 ## Purpose and Scope
 
-The Version Control Platform Adapters provide a unified interface for interacting with different Git hosting platforms including GitHub, Gitee, and GitCode. This system abstracts platform-specific API differences through the adapter pattern, enabling consistent access to repository information, releases, and download statistics across multiple platforms.
+The Version Control Platform Adapters provide a unified interface for interacting with different Git hosting platforms including GitHub, Gitee, and GitCode. This system abstracts platform-specific API differences through the adapter pattern, enabling consistent access to repository information, releases, download statistics, and source archives across multiple platforms.
 
 For external service configuration details, see [External Service Configuration](/Laniakea2012/openchecker/5.2-external-service-configuration). For information about the broader platform integration architecture, see [Platform Integration and External Services](/Laniakea2012/openchecker/5-platform-integration-and-external-services).
 
@@ -28,6 +28,8 @@ classDiagram
         +get_zipball_url(project_url, tag) : Optional[str]
         +get_repo_info(project_url) : Tuple[Dict, Optional[str]]
         +get_download_stats(project_url) : Tuple[Dict, Optional[str]]
+        +get_download_headers() : Dict[str, str]
+        +download_project_source(project_url, version_number, dest_root) : Tuple[bool, Optional[str]]
     }
     class GitHubAdapter {
         +access_token str
@@ -65,6 +67,8 @@ classDiagram
         +get_zipball_url(project_url, tag) : Optional[str]
         +get_repo_info(project_url) : Tuple[Dict, Optional[str]]
         +get_download_stats(project_url) : Tuple[Dict, Optional[str]]
+        +get_download_headers() : Dict[str, str]
+        +download_project_source(project_url, version_number, dest_root) : Tuple[bool, Optional[str]]
     }
     PlatformAdapter <|-- GitHubAdapter
     PlatformAdapter <|-- GiteeAdapter
@@ -188,6 +192,19 @@ Common error types include:
 
 Sources: [openchecker/platform_adapter.py L353-L463](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/openchecker/platform_adapter.py#L353-L463)
 
+### Source Archive Download
+
+Every adapter can also fetch the source archive of a tagged release through `download_project_source(project_url, version_number, dest_root)`, which the agent uses before falling back to a `git clone`:
+
+| Behaviour | Description |
+| --- | --- |
+| Version handling | `None`, `""` and the protocol placeholder `"None"` are normalised to `None`; a missing version returns `(False, "Version number is required ...")` so the caller falls back to the clone path |
+| Target directory | The archive is extracted into `<dest_root>/<repo_name>`, matching the directory name used by the `download-checkout` shell script |
+| Existing checkout | When `<dest_root>/<repo_name>` already exists the download is skipped and `(True, None)` is returned |
+| Safe extraction | Entries containing `../` and symbolic link entries are rejected before extraction, so a malicious archive cannot escape the staging directory |
+| Authentication | `GitHubAdapter` sends `Authorization: Bearer <access_key>`; Gitee and GitCode rely on anonymous archive downloads |
+| Error handling | HTTP errors, timeouts, invalid archives and filesystem errors are converted into `(False, message)` instead of raising |
+
 ## Configuration Requirements
 
 The platform adapters require access tokens configured in the system configuration file. Each platform section must include an `access_key` parameter for API authentication.
@@ -309,8 +326,7 @@ The platform adapters provide essential metadata for project analysis including:
 * Release version information for vulnerability scanning
 * Repository descriptions for project classification
 * Download statistics for popularity metrics
-* Source code archive URLs for local analysis
+* Source code archives fetched by `download_project_source` for local analysis
 
 Sources: [openchecker/platform_adapter.py L465-L466](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/openchecker/platform_adapter.py#L465-L466)
-
  [docs/platform-adapter.md L1-L246](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/docs/platform-adapter.md#L1-L246)
