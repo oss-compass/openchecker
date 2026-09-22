@@ -75,6 +75,15 @@ def _extract_top_level_permissions(workflow: Dict, file_path: str) -> List[Dict[
     
     # 处理详细的权限声明
     if isinstance(perms, dict):
+        if not perms:
+            permissions.append({
+                "file_path": file_path,
+                "location_type": PERMISSION_LOCATION_TOP,
+                "name": None,
+                "value": "{}",
+                "permission_level": PERMISSION_LEVEL_NONE,
+                "line_number": 1
+            })
         for perm_name, perm_value in perms.items():
             if perm_name in PERMISSIONS_OF_INTEREST or perm_value == "write":
                 permissions.append({
@@ -134,6 +143,16 @@ def _extract_job_level_permissions(workflow: Dict, file_path: str) -> List[Dict[
         
         # 处理详细权限声明
         if isinstance(job_perms, dict):
+            if not job_perms:
+                permissions.append({
+                    "file_path": file_path,
+                    "location_type": PERMISSION_LOCATION_JOB,
+                    "name": None,
+                    "value": "{}",
+                    "permission_level": PERMISSION_LEVEL_NONE,
+                    "line_number": 1,
+                    "job_name": job_name
+                })
             for perm_name, perm_value in job_perms.items():
                 if perm_name in PERMISSIONS_OF_INTEREST or perm_value == "write":
                     permissions.append({
