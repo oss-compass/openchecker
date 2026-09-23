@@ -276,6 +276,169 @@ class TestFuzzingChecker(unittest.TestCase):
         # result = fuzzing_checker.detect_go_fuzzing(self.repo_path)
         # self.assertTrue(result["found"])
 
+    def test_extract_languages_from_bytes_json_object(self):
+        """测试从bytes形式的JSON对象中提取语言列表"""
+        # shell_exec 返回的是 github-linguist stdout 的原始字节，这是语言
+        # 检测器成功时的正常形态，必须先 decode 再解析。
+        self.assertEqual(
+            fuzzing_checker._extract_languages(b'{"Go": 100.0}'),
+            ["go"]
+        )
+        self.assertEqual(
+            fuzzing_checker._extract_languages(b'{"Go": 70.0, "Rust": 30.0}'),
+            ["go", "rust"]
+        )
+
+    def test_extract_languages_keeps_linguist_order(self):
+        """测试语言顺序与github-linguist输出顺序保持一致"""
+        self.assertEqual(
+            fuzzing_checker._extract_languages(b'{"Rust": 60.0, "Python": 40.0}'),
+            ["rust", "python"]
+        )
+
+    def test_extract_languages_from_json_list(self):
+        """测试兼容JSON数组形式的语言输出"""
+        self.assertEqual(
+            fuzzing_checker._extract_languages(b'["Go", "Rust"]'),
+            ["go", "rust"]
+        )
+
+    def test_extract_languages_aliases_display_names(self):
+        """测试C++/JavaScript/TypeScript等展示名映射为配置键"""
+        self.assertEqual(
+            fuzzing_checker._extract_languages(
+                b'{"C++": 50.0, "JavaScript": 30.0, "TypeScript": 20.0}'
+            ),
+            ["cpp", "javascript", "typescript"]
+        )
+        # github-linguist 使用展示名，而语言配置键是全小写的。
+        self.assertEqual(
+            fuzzing_checker._extract_languages(b'{"Java": 100.0}'),
+            ["java"]
+        )
+
+    def test_extract_languages_accepts_decoded_text(self):
+        """测试已解码的字符串输出同样可以解析"""
+        self.assertEqual(
+            fuzzing_checker._extract_languages('{"Go": 100.0}'),
+            ["go"]
+        )
+
+    def test_extract_languages_drops_unknown_names(self):
+        """测试没有对应模糊测试配置的语言名被丢弃"""
+        self.assertEqual(
+            fuzzing_checker._extract_languages(b'{"C#": 60.0, "Shell": 40.0}'),
+            []
+        )
+        self.assertEqual(
+            fuzzing_checker._extract_languages(b'{"Go": 80.0, "C#": 20.0}'),
+            ["go"]
+        )
+
+    def test_extract_languages_deduplicates_aliases(self):
+        """测试同一语言的不同展示名只返回一次"""
+        self.assertEqual(
+            fuzzing_checker._extract_languages(b'{"Go": 60.0, "golang": 40.0}'),
+            ["go"]
+        )
+        self.assertEqual(
+            fuzzing_checker._extract_languages(b'{"C": 50.0, "c++": 50.0}'),
+            ["c", "cpp"]
+        )
+
+    def test_extract_languages_handles_non_string_names(self):
+        """测试JSON数组中的非字符串元素被安全跳过"""
+        self.assertEqual(
+            fuzzing_checker._extract_languages(b'["Go", 1, null, "Rust"]'),
+            ["go", "rust"]
+        )
+
+    def test_extract_languages_empty_and_malformed_output(self):
+        """测试空输出与非法JSON不会抛异常并回退到全部语言"""
+        self.assertEqual(fuzzing_checker._extract_languages(b''), [])
+        self.assertEqual(fuzzing_checker._extract_languages(b'{}'), [])
+        self.assertEqual(fuzzing_checker._extract_languages(b'not json'), [])
+        self.assertEqual(fuzzing_checker._extract_languages(None), [])
+        # 裸 JSON 数字是合法 JSON，但不含任何语言信息。
+        self.assertEqual(fuzzing_checker._extract_languages(b'42'), [])
+        # 非 UTF-8 字节同样应被容错处理。
+        self.assertEqual(fuzzing_checker._extract_languages(b'\xff\xfe'), [])
+        # 空语言列表会让 check_language_fuzzing 检测全部配置。
+        results = fuzzing_checker.check_language_fuzzing(
+            self.repo_path,
+            fuzzing_checker._extract_languages(b'malformed')
+        )
+        self.assertEqual(len(results), len(fuzzing_checker.get_language_configs()))
+
+    @patch('openchecker.checkers.fuzzing_checker.shell_exec')
+    @patch('openchecker.checkers.fuzzing_checker.platform_manager')
+    def test_fuzzing_checker_reports_language_results(self, mock_platform, mock_shell):
+        """测试识别到语言时返回ClusterFuzzLite与语言级结果"""
+        mock_platform.parse_project_url.return_value = ("owner", self.repo_path)
+        mock_shell.return_value = (b'{"Go": 100.0}', None)
+
+        res_payload = {"scan_results": {}}
+        fuzzing_checker.fuzzing_checker("https://github.com/owner/repo", res_payload)
+
+        scan_result = res_payload["scan_results"]["fuzzing-checker"]
+        # 修复前这里是 {"error": "'int' object has no attribute 'lower'"}。
+        self.assertIsInstance(scan_result, list)
+        self.assertTrue(all("tool" in entry for entry in scan_result))
+        tools = [entry["tool"] for entry in scan_result]
+        self.assertIn("ClusterFuzzLite", tools)
+        self.assertIn("GO NATIVE", tools)
+        # 仅上报实际识别到的语言，而不是所有支持的语言。
+        self.assertEqual(len(tools), 2)
+
+    @patch('openchecker.checkers.fuzzing_checker.shell_exec')
+    @patch('openchecker.checkers.fuzzing_checker.platform_manager')
+    def test_fuzzing_checker_falls_back_when_detector_fails(self, mock_platform, mock_shell):
+        """测试检测器失败时回退到全部语言且仍返回ClusterFuzzLite"""
+        mock_platform.parse_project_url.return_value = ("owner", self.repo_path)
+        mock_shell.return_value = (None, b'boom')
+
+        res_payload = {"scan_results": {}}
+        fuzzing_checker.fuzzing_checker("https://github.com/owner/repo", res_payload)
+
+        scan_result = res_payload["scan_results"]["fuzzing-checker"]
+        self.assertIsInstance(scan_result, list)
+        tools = [entry["tool"] for entry in scan_result]
+        self.assertIn("ClusterFuzzLite", tools)
+        # 语言检测失败时回退到检测全部语言配置。
+        self.assertEqual(len(tools), len(fuzzing_checker.get_language_configs()) + 1)
+
+    @patch('openchecker.checkers.fuzzing_checker.shell_exec')
+    @patch('openchecker.checkers.fuzzing_checker.platform_manager')
+    def test_fuzzing_checker_falls_back_on_empty_output(self, mock_platform, mock_shell):
+        """测试github-linguist返回空输出时不抛异常并回退到全部语言"""
+        mock_platform.parse_project_url.return_value = ("owner", self.repo_path)
+        mock_shell.return_value = (b'', None)
+
+        res_payload = {"scan_results": {}}
+        fuzzing_checker.fuzzing_checker("https://github.com/owner/repo", res_payload)
+
+        scan_result = res_payload["scan_results"]["fuzzing-checker"]
+        self.assertIsInstance(scan_result, list)
+        tools = [entry["tool"] for entry in scan_result]
+        self.assertIn("ClusterFuzzLite", tools)
+        self.assertEqual(len(tools), len(fuzzing_checker.get_language_configs()) + 1)
+
+    @patch('openchecker.checkers.fuzzing_checker.shell_exec')
+    @patch('openchecker.checkers.fuzzing_checker.platform_manager')
+    def test_fuzzing_checker_falls_back_on_malformed_json(self, mock_platform, mock_shell):
+        """测试非法JSON输出时回退到全部语言而不是写入error"""
+        mock_platform.parse_project_url.return_value = ("owner", self.repo_path)
+        mock_shell.return_value = (b'{"Go": ', None)
+
+        res_payload = {"scan_results": {}}
+        fuzzing_checker.fuzzing_checker("https://github.com/owner/repo", res_payload)
+
+        scan_result = res_payload["scan_results"]["fuzzing-checker"]
+        self.assertIsInstance(scan_result, list)
+        tools = [entry["tool"] for entry in scan_result]
+        self.assertIn("ClusterFuzzLite", tools)
+        self.assertEqual(len(tools), len(fuzzing_checker.get_language_configs()) + 1)
+
 
 class TestBinaryChecker(unittest.TestCase):
     """二进制文件检查器测试类"""
