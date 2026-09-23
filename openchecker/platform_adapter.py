@@ -124,7 +124,7 @@ class GitHubAdapter(PlatformAdapter):
         """获取GitHub releases"""
         try:
             owner_name, repo_name = self.parse_project_url(project_url)
-            api = GhApi(owner=owner_name, repo=repo_name)
+            api = GhApi(owner=owner_name, repo=repo_name, token=self.access_token or None)
             
             all_releases = []
             for page in paged(api.repos.list_releases, owner_name, repo_name, per_page=10):
