@@ -97,7 +97,7 @@ def consumer(config, queue_name, callback_func):
         '/', 
         credentials, 
         heartbeat=int(config['heartbeat_interval_s']), 
-        blocked_connection_timeout=int(config['blocked_connection_timeout_ms'])
+        blocked_connection_timeout=float(config['blocked_connection_timeout_ms']) / 1000
     )
     
     # Create thread pool for executing time-consuming tasks
