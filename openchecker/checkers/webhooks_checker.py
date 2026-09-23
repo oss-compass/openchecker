@@ -5,6 +5,20 @@ from typing import Any, List, Dict
 
 
 COMMAND = 'webhooks-checker'
+SENSITIVE_FIELDS = {'password', 'secret', 'token', 'access_token', 'authorization', 'api_key', 'private_key'}
+
+
+def _redact_credentials(value):
+    """Copy a webhook response without forwarding credential fields to callbacks."""
+    if isinstance(value, dict):
+        return {
+            key: ('******' if item else item) if str(key).lower() in SENSITIVE_FIELDS
+            else _redact_credentials(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_credentials(item) for item in value]
+    return value
 
 
 def get_webhooks(project_url, access_token):
@@ -65,10 +79,7 @@ def webhooks_checker(project_url: str, res_payload: dict, access_token: str) -> 
     if access_token:
         hooks, error_msg = get_webhooks(project_url, access_token)
         if error_msg is None:
-            webhooks_hooks = [
-                {**hook, "password": "******"} 
-                if hook.get("password") else hook for hook in hooks
-            ]
+            webhooks_hooks = _redact_credentials(hooks)
     
     res_payload["scan_results"][COMMAND] = {
         "access_token": True if access_token else False,
