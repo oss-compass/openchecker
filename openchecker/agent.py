@@ -14,6 +14,7 @@ Author: OpenChecker Team
 import json
 import os
 import re
+import shlex
 from datetime import datetime
 from typing import Any, Dict, List
 
@@ -121,33 +122,33 @@ def ruby_licenses(data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Updated data with detected licenses
     """
-    github_url_pattern = "https://github.com/"
-    
     for item in data["analyzer"]["result"]["packages"]:
-        declared_licenses = item["declared_licenses"]
-        homepage_url = item.get('homepage_url', '')
-        vcs_url = item.get('vcs_processed', {}).get('url', '').replace('.git', '')
+        declared_licenses = item.get("declared_licenses")
+        if declared_licenses is None:
+            declared_licenses = item["declared_licenses"] = []
+        homepage_url = item.get('homepage_url') or ''
+        vcs_url = (item.get('vcs_processed') or {}).get('url') or ''
 
         # Check if declared_licenses is empty
-        if not declared_licenses or len(declared_licenses) == 0:
-            # Prioritize checking if vcs_url is a GitHub address
-            if vcs_url.startswith(github_url_pattern):
-                project_url = vcs_url
-            elif homepage_url.startswith(github_url_pattern):
-                project_url = homepage_url
-            else:
-                project_url = None
+        if not declared_licenses:
+            # Package metadata is untrusted and this URL is interpolated into bash.
+            github_repo = r"https://github\.com/[A-Za-z0-9-]+/[A-Za-z0-9._-]+(?:\.git)?"
+            project_url = next((url for url in (vcs_url, homepage_url)
+                                if re.fullmatch(github_repo, url)), None)
                 
             # If a valid GitHub address is found, clone the repository and call licensee
             if project_url:
-                shell_script = shell_script_handlers["license-detector"].format(project_url=project_url)
+                project_url = re.sub(r'\.git$', '', project_url)
+                shell_script = shell_script_handlers["license-detector"].format(
+                    project_url=shlex.quote(project_url))
                 result, error = shell_exec(shell_script)
                 
                 if error is None:
                     try:
                         license_info = json.loads(result)
                         licenses_name = get_licenses_name(license_info)
-                        item['declared_licenses'].append(licenses_name)
+                        if licenses_name:
+                            declared_licenses.append(licenses_name)
                     except json.JSONDecodeError as e:
                         logger.error(f"Failed to parse JSON from {project_url}: {e}")
                 else:
