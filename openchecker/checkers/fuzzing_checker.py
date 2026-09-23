@@ -1,6 +1,7 @@
 import os
 import glob
 import re
+import json
 from typing import List, Dict, Tuple
 from constans import shell_script_handlers
 from common import shell_exec
@@ -174,6 +175,90 @@ def find_files_with_pattern(repo_path: str, file_patterns: List[str]) -> List[st
         found_files.extend(matching_files)
     return found_files
 
+# github-linguist（"languages-detector" 处理器调用）使用自己的展示名上报语言，
+# 例如 "C++"、"C#"、"JavaScript"、"TypeScript"。这些名字与
+# get_language_configs() 返回的小写配置键（如 "cpp"、"javascript"）并不一致，
+# 所以在选择语言级模糊测试项之前必须先把 github-linguist 的原始输出归一化。
+# 没有对应语言配置的展示名（例如 "C#"、"Shell"、"HTML"）刻意不在此映射表中，
+# 会被下面的 _extract_languages() 丢弃。
+LINGUIST_LANGUAGE_ALIASES = {
+    'c': 'c',
+    'c++': 'cpp',
+    'cpp': 'cpp',
+    'go': 'go',
+    'golang': 'go',
+    'haskell': 'haskell',
+    'java': 'java',
+    'javascript': 'javascript',
+    'python': 'python',
+    'rust': 'rust',
+    'typescript': 'typescript',
+}
+
+
+def _extract_languages(shell_output) -> List[str]:
+    """将 github-linguist 的输出归一化为语言配置键列表
+
+    "languages-detector" 处理器执行
+    ``github-linguist $project_name --breakdown --json``（见 constans.py），
+    其 stdout 是一个 JSON 对象：键为 github-linguist 的展示名，值为占比，
+    例如 b'{"JavaScript": 70.0, "C++": 30.0}'。而 shell_exec 返回的是
+    process.communicate() 的原始字节，未做解码，因此必须先 decode 再
+    json.loads：直接遍历 bytes 得到的是 int，这正是过去在这里抛出
+    AttributeError: 'int' object has no attribute 'lower' 的原因。
+
+    展示名经由 LINGUIST_LANGUAGE_ALIASES 映射，没有对应语言配置的名字会被
+    丢弃；返回值为小写配置键，保持 github-linguist 的输出顺序并去重。
+
+    shell_exec 在处理器失败时返回 None，None 不能直接交给 json.loads。
+    凡是不可用的输出（None、b''、非法 JSON、非 UTF-8 字节）都返回空列表，
+    由 check_language_fuzzing() 回退为检测全部支持的语言，而不是抛出异常。
+
+    Args:
+        shell_output: 语言检测器 handler 的原始 stdout，通常是 bytes；
+            失败时为 None。
+
+    Returns:
+        小写语言配置键列表；无法使用时返回空列表。
+    """
+    if not shell_output:
+        # shell_exec 在 handler 退出非 0 时返回 None，成功但没有输出时返回
+        # b''，两者都表示"没有可用的语言信息"。
+        return []
+
+    try:
+        if isinstance(shell_output, (bytes, bytearray)):
+            # 先解码再解析：bytes 既不是 JSON 也不是文本，遍历 bytes 得到 int。
+            decoded = shell_output.decode('utf-8')
+        else:
+            decoded = str(shell_output)
+        parsed = json.loads(decoded)
+    except (UnicodeDecodeError, ValueError, TypeError, AttributeError):
+        # 非法 JSON、非 UTF-8 字节或意外类型都不能让检查器崩溃，
+        # 统一按"没有语言信息"处理。
+        return []
+
+    if isinstance(parsed, dict):
+        # github-linguist --json 输出以展示名为键的对象，如 {"Go": 100.0}，
+        # 只有键携带语言信息。
+        names = list(parsed.keys())
+    elif isinstance(parsed, list):
+        # 同时兼容其他版本返回的纯语言名数组。
+        names = parsed
+    else:
+        # 裸 JSON 数字或字符串不含任何可用的语言信息。
+        return []
+
+    known_languages = get_language_configs()
+    languages = []
+    for name in names:
+        if not isinstance(name, str):
+            continue
+        alias = LINGUIST_LANGUAGE_ALIASES.get(name.strip().lower())
+        # 丢弃没有对应配置的语言（如 "C#"、"Shell"），并避免重复上报同一语言。
+        if alias in known_languages and alias not in languages:
+            languages.append(alias)
+    return languages
 
 def check_file_content(file_path: str, func_pattern: str) -> bool:
     """检查文件内容是否包含指定模式"""
@@ -202,11 +287,11 @@ def fuzzing_checker(project_url: str, res_payload: dict) -> None:
     # 检测语言特定的模糊测试
     shell_script = shell_script_handlers["languages-detector"].format(project_url=project_url)
     result, error = shell_exec(shell_script)
-    if error is None:
-        languages = result
-    else:
-        languages = []
-    languages = [lang.lower() for lang in languages]
+    # shell_exec 返回的是 github-linguist stdout 的原始字节，失败时为 None；
+    # 由 _extract_languages() 负责解码与归一化。不可用的输出（None、空输出
+    # 或非法 JSON）会得到空列表，使下面的 check_language_fuzzing() 回退为
+    # 检测全部支持的语言，而不是抛异常。
+    languages = _extract_languages(result) if error is None else []
     lang_results = check_language_fuzzing(repo_path, languages)
     all_results.extend(lang_results)
     
