@@ -208,7 +208,7 @@ def request_url(url: str, payload: Dict[str, Any]) -> tuple[str, str]:
     """
     response = post_with_backoff(url=url, json=payload)
 
-    if response.status_code == 200:
+    if 200 <= response.status_code < 300:
         return response.text, None
     else:
         return None, f"Failed to send request. Status code: {response.status_code}"
@@ -293,7 +293,9 @@ def callback_func(ch, method, properties, body):
         os.chdir(original_cwd)
         logger.info(f"Restored working directory: {os.getcwd()}")
 
-        _send_results(callback_url, res_payload)
+        if not _send_results(callback_url, res_payload):
+            _handle_error_and_nack(ch, method, body, "Failed to deliver callback results")
+            return
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
         logger.info(
@@ -520,23 +522,27 @@ def _cleanup_project_source(project_url: str) -> None:
         logger.error(f"Exception during source cleanup: {e}")
 
 
-def _send_results(callback_url: str, res_payload: Dict[str, Any]) -> None:
+def _send_results(callback_url: str, res_payload: Dict[str, Any]) -> bool:
     """
-    Send results to callback URL.
+    Send results to callback URL and report whether delivery succeeded.
     
     Args:
         callback_url: Callback URL
         res_payload: Response payload
     """
-    if callback_url:
-        try:
-            response, err = request_url(callback_url, res_payload)
-            if err is None:
-                logger.info("Results sent successfully")
-            else:
-                logger.error(f"Failed to send results: {err}")
-        except Exception as e:
-            logger.error(f"Exception sending results: {e}")
+    if not callback_url:
+        logger.error("Cannot send results without a callback URL")
+        return False
+
+    try:
+        response, err = request_url(callback_url, res_payload)
+        if err is None:
+            logger.info("Results sent successfully")
+            return True
+        logger.error(f"Failed to send results: {err}")
+    except Exception as e:
+        logger.error(f"Exception sending results: {e}")
+    return False
 
 
 def _handle_error_and_nack(ch, method, body, error_msg: str) -> None:
