@@ -48,7 +48,7 @@ from checkers.token_permissions_checker import token_permissions_checker
 from checkers.url_checker import url_checker
 from checkers.webhooks_checker import webhooks_checker
 from common import shell_exec
-from constans import shell_script_handlers
+from constants import shell_script_handlers
 from exponential_backoff import post_with_backoff
 from helper import read_config
 from logger import get_logger, log_performance, setup_logging

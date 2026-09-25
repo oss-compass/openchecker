@@ -4,7 +4,7 @@ import time
 import re
 import requests
 from typing import Dict, Tuple
-from constans import shell_script_handlers
+from constants import shell_script_handlers
 from common import shell_exec
 from platform_adapter import platform_manager
 from logger import get_logger
@@ -15,7 +15,7 @@ logger = get_logger('openchecker.checkers.sonar_checker')
 def _build_sonar_url(sonar_config: dict, path: str) -> str:
     """
     Build SonarQube API URL
-    Matches the logic in shell script (constans.py):
+    Matches the logic in shell script (constants.py):
     - If host already contains protocol (http:// or https://), use it directly
     - If host is an IP address, use http://IP:port
     - If host is a domain name, use https://domain (443 is default HTTPS port)

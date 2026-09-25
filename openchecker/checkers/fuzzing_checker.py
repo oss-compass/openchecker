@@ -2,7 +2,7 @@ import os
 import glob
 import re
 from typing import List, Dict, Tuple
-from constans import shell_script_handlers
+from constants import shell_script_handlers
 from common import shell_exec
 from platform_adapter import platform_manager
 
