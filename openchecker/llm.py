@@ -3,6 +3,9 @@ import torch
 import openai, time, random
 from openai import OpenAI
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 def retry_with_exponential_backoff(
     func,
@@ -39,7 +42,7 @@ def retry_with_exponential_backoff(
                 delay *= exponential_base
  
                 # Sleep for the delay
-                print("sleep: ", delay, " s")
+                logger.debug(f"Retrying after {delay} s sleep")
                 time.sleep(delay)
  
             # # Raise exceptions for any errors not specified
