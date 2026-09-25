@@ -7,6 +7,9 @@ from typing import List, Dict, Tuple, Any
 from pathlib import Path
 from common import get_platform_type, list_workflow_files
 from platform_adapter import platform_manager
+from logger import get_logger
+
+logger = get_logger('openchecker.checkers.token_permissions_checker')
 
 
 COMMAND = 'token-permissions-checker'
@@ -180,7 +183,7 @@ def _extract_workflow_permissions(workflow_file: str, repo_path: str) -> List[Di
         permissions.extend(job_permissions)
         
     except Exception as e:
-        pass
+        logger.debug(f"Failed to parse token permissions: {e}")
         
     return permissions
 
