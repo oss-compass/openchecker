@@ -44,7 +44,9 @@ class ThreadSafeChannel:
 # Get logger for message queue module
 logger = get_logger('openchecker.queue')
 
-def create_queue(config, queue_name, arguments={}):
+def create_queue(config, queue_name, arguments=None):
+    if arguments is None:
+        arguments = {}
     credentials = pika.PlainCredentials(config['username'], config['password'])
     parameters = pika.ConnectionParameters(config['host'], int(config['port']), '/', credentials)
 
