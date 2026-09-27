@@ -3,8 +3,6 @@ import time
 from urllib.parse import urlparse
 from elasticsearch import Elasticsearch, RequestsHttpConnection
 from logger import get_logger
-import time
-import urllib3
 
 logger = get_logger('openchecker.database.repo')
 urllib3.disable_warnings()
@@ -196,9 +194,3 @@ if __name__ == '__main__':
         logger.info("write back to: ", result_projects_file_path)
     
     '''
-    
-    
-    client = get_elasticsearch_client(opensearch_url)
-    repo = "https://github.com/dgrammatiko/wysiwyg-tinymce-j4.1"
-    
-    print(check_repo_china(client, repo))

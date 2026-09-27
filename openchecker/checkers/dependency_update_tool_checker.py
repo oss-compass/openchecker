@@ -1,6 +1,9 @@
 import os
 from platform_adapter import platform_manager
 from typing import List, Optional, Dict, Any
+from logger import get_logger
+
+logger = get_logger('openchecker.checkers.dependency_update_tool_checker')
 
 COMMAND = 'dependency-update-tool-checker'
 
@@ -161,7 +164,7 @@ def _check_dependency_files(repo_path: str) -> List[Dict[str, Any]]:
         )
         tools.append(tool)
     
-    print(tools)
+    logger.debug(f"Found dependency update tools: {tools}")
     
     return tools
 
