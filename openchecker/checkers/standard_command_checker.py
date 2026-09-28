@@ -124,6 +124,9 @@ def get_code_count(project_url: str) -> Tuple[Dict, str]:
         if result.stdout.strip() == "":
             return {"code_count": 0}, None
         result_json = json.loads(result.stdout)
+        # cloc emits an empty JSON object when no countable files are found.
+        if result_json == {}:
+            return {"code_count": 0}, None
         code_count = result_json['SUM']['code']
         return {"code_count": code_count}, None
     else:
