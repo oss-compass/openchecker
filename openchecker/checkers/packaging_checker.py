@@ -1,10 +1,40 @@
 import re
+import yaml
 from typing import List, Dict, Tuple, Any
 from pathlib import Path
 from common import get_platform_type, list_workflow_files
 from platform_adapter import platform_manager
 
 COMMAND = 'packaging-checker'
+
+
+def _normalize_run_blocks(content: str) -> List[str]:
+    """Expose block-scalar commands to the existing patterns, retaining line indices."""
+    lines = content.split('\n')
+    def mapping_value(node, name):
+        if isinstance(node, yaml.MappingNode):
+            return next((value for key, value in node.value
+                         if isinstance(key, yaml.ScalarNode) and key.value == name), None)
+        return None
+
+    jobs = mapping_value(yaml.compose(content, Loader=yaml.SafeLoader), 'jobs')
+    if not isinstance(jobs, yaml.MappingNode):
+        return lines
+    for _, job in jobs.value:
+        steps = mapping_value(job, 'steps')
+        if not isinstance(steps, yaml.SequenceNode):
+            continue
+        for step in steps.value:
+            if not isinstance(step, yaml.MappingNode):
+                continue
+            for key, value in step.value:
+                if (isinstance(key, yaml.ScalarNode) and key.value == 'run'
+                        and isinstance(value, yaml.ScalarNode) and value.style in ('|', '>')):
+                    # YAML resolves folding/chomping; literal commands remain separate.
+                    # Keep each entry tied to the original run key for line reporting.
+                    lines[key.start_mark.line] = '\n'.join(
+                        'run: ' + command for command in value.value.splitlines())
+    return lines
 
 def _match_pattern_group(content: str, lines: List[str], pattern_group: Dict[str, str]) -> bool:
     """
@@ -140,7 +170,8 @@ def is_packaging_workflow(file_path: str) -> Dict[str, Any]:
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        lines = content.split('\n')
+        lines = _normalize_run_blocks(content)
+        content = '\n'.join(lines)
         
         # 检查每个打包模式
         for pattern_group in packaging_patterns:
