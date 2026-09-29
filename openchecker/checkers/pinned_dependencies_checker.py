@@ -91,21 +91,7 @@ def _is_version_pinned(ref: str) -> bool:
     if _is_docker_image_pinned(ref):
         return True
         
-    # 更宽松的版本匹配：支持 v3, v1.0, 1.2, v1.0.0 等各种格式
-    version_patterns = [
-        r'^v?(\d+)(\.\d+)?(\.\d+)?(-[\w\.-]+)?(\+[\w\.-]+)?$',  # 通用版本格式
-        r'^v(\d+)$',  # 简单的v3, v4等
-        r'^(\d+)\.(\d+)$',  # 1.2, 2.5等
-    ]
-    # 额外检查：排除一些明显不是版本的标签
-    excluded_tags = {'latest', 'main', 'master', 'dev', 'develop', 'head', 'trunk'}
-    
-    for pattern in version_patterns:
-        if re.match(pattern, ref):
-            if ref.lower() not in excluded_tags:
-                return True
-        
-    # 其他情况（如分支名main、master等）认为不固定
+    # Tags can be moved, even when they look like fixed versions.
     return False
 
 
