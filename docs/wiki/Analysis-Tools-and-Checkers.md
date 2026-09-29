@@ -5,6 +5,7 @@
 > * [config/ohpm_repo.json](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/config/ohpm_repo.json)
 > * [openchecker/checkers/binary_checker.py](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/openchecker/checkers/binary_checker.py)
 > * [openchecker/checkers/changed_files_checker.py](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/openchecker/checkers/changed_files_checker.py)
+> * [openchecker/checkers/ci_tests_checker.py](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/openchecker/checkers/ci_tests_checker.py)
 > * [openchecker/checkers/document_checker.py](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/openchecker/checkers/document_checker.py)
 > * [openchecker/checkers/release_checker.py](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/openchecker/checkers/release_checker.py)
 > * [openchecker/checkers/sonar_checker.py](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/openchecker/checkers/sonar_checker.py)
@@ -393,6 +394,78 @@ The system queries specific SonarQube metrics after analysis completion:
 * **Lines**: Total lines of code
 
 Sources: [openchecker/checkers/sonar_checker.py L14-L173](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/openchecker/checkers/sonar_checker.py#L14-L173)
+
+### CI-Tests Check
+
+The `ci_tests_checker` module re-implements the OSSF Scorecard `CI-Tests` check in-process, so callers no longer have to fall back to the GitHub-only `scorecard` CLI to find out whether a project actually runs tests. It walks every workflow file returned by `list_workflow_files()` and reports each test invocation it finds as evidence.
+
+```mermaid
+flowchart TD
+
+ProjectURL["project_url"]
+ParseURL["platform_manager.parse_project_url()"]
+PlatformType["get_platform_type()"]
+ListWorkflows["list_workflow_files()"]
+ParseWorkflow["_parse_workflow_for_ci_tests()"]
+YamlLoad["yaml.safe_load()<br>jobs.*.steps[].run"]
+RegexFallback["Regex fallback<br>on yaml.YAMLError"]
+TestWorkflows["test_workflows<br>{file_path, tool_name, snippet}"]
+HasCITests["has_ci_tests<br>boolean"]
+
+ProjectURL --> ParseURL
+ProjectURL --> PlatformType
+ParseURL --> ListWorkflows
+PlatformType --> ListWorkflows
+ListWorkflows --> ParseWorkflow
+ParseWorkflow --> YamlLoad
+ParseWorkflow --> RegexFallback
+YamlLoad --> TestWorkflows
+RegexFallback --> TestWorkflows
+TestWorkflows --> HasCITests
+
+subgraph subGraph2 ["Output"]
+    TestWorkflows
+    HasCITests
+    TestWorkflows --> HasCITests
+end
+
+subgraph subGraph1 ["Workflow Parsing"]
+    ParseWorkflow
+    YamlLoad
+    RegexFallback
+    ParseWorkflow --> YamlLoad
+    ParseWorkflow --> RegexFallback
+end
+
+subgraph subGraph0 ["Inputs and Discovery"]
+    ProjectURL
+    ParseURL
+    PlatformType
+    ListWorkflows
+    ProjectURL --> ParseURL
+    ProjectURL --> PlatformType
+    ParseURL --> ListWorkflows
+    PlatformType --> ListWorkflows
+end
+```
+
+Supported test runners and their matching patterns:
+
+| Ecosystem | Tool | Pattern |
+| --- | --- | --- |
+| Python | pytest | `(python -m )?pytest` or `py.test` |
+| Python | tox | `tox` |
+| Node.js | npm/yarn/pnpm | `npm (run )?test`, `yarn test`, `pnpm test` |
+| Go | go test | `go test` |
+| Java | Maven | `mvn .*(test\|verify)` |
+| Java | Gradle | `(./)?gradlew? .*test` |
+| Java | sbt | `sbt test` |
+| Rust | Cargo | `cargo test` |
+| .NET | dotnet | `dotnet test` |
+| Ruby | RSpec/Rake | `(bundle exec )?(rspec\|rake test)` |
+| Generic | make | `make test` |
+
+Sources: [openchecker/checkers/ci_tests_checker.py L1-L135](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/openchecker/checkers/ci_tests_checker.py#L1-L135)
 
 ## SBOM Analysis
 

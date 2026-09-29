@@ -22,6 +22,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from openchecker.checkers import (
     sast_checker,
+    ci_tests_checker,
     security_policy_checker,
     token_permissions_checker,
     fuzzing_checker,
@@ -108,6 +109,147 @@ class TestSASTChecker(unittest.TestCase):
         self.assertIsInstance(result, list)
         if result:
             self.assertIn("tools", result[0])
+
+
+class TestCITestsChecker(unittest.TestCase):
+    """CI-Tests检查器测试类"""
+
+    def setUp(self):
+        """测试前置设置"""
+        self.temp_dir = tempfile.mkdtemp()
+        self.repo_path = os.path.join(self.temp_dir, "test_repo")
+        os.makedirs(self.repo_path)
+
+    def tearDown(self):
+        """测试后清理"""
+        if os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir)
+
+    def test_parse_workflow_for_ci_tests_pytest(self):
+        """测试检测pytest测试调用"""
+        workflow_content = """
+        name: CI
+        on: [push, pull_request]
+        jobs:
+          test:
+            runs-on: ubuntu-latest
+            steps:
+              - uses: actions/checkout@v2
+              - name: Run unit tests
+                run: pytest -q
+        """
+
+        detected_tests = ci_tests_checker._parse_workflow_for_ci_tests(workflow_content)
+        tool_names = [item["tool_name"] for item in detected_tests]
+        self.assertIn("pytest", tool_names)
+
+    def test_parse_workflow_for_ci_tests_npm(self):
+        """测试检测npm test调用"""
+        workflow_content = """
+        name: CI
+        jobs:
+          test:
+            steps:
+              - run: npm test
+        """
+
+        detected_tests = ci_tests_checker._parse_workflow_for_ci_tests(workflow_content)
+        tool_names = [item["tool_name"] for item in detected_tests]
+        self.assertIn("node", tool_names)
+
+    def test_parse_workflow_for_ci_tests_none(self):
+        """测试无测试命令时返回空列表"""
+        workflow_content = """
+        name: CI
+        jobs:
+          build:
+            steps:
+              - run: echo hello
+        """
+
+        detected_tests = ci_tests_checker._parse_workflow_for_ci_tests(workflow_content)
+        self.assertEqual(detected_tests, [])
+
+    def test_parse_workflow_invalid_yaml(self):
+        """测试无效YAML内容不抛异常"""
+        invalid_yaml = "invalid: yaml: content: ["
+
+        # 应该不抛出异常，而是返回列表（使用正则表达式兜底）
+        detected_tests = ci_tests_checker._parse_workflow_for_ci_tests(invalid_yaml)
+        self.assertIsInstance(detected_tests, list)
+
+    @patch('openchecker.checkers.ci_tests_checker.list_workflow_files')
+    def test_detect_ci_test_workflows(self, mock_list_files):
+        """测试扫描工作流文件检测CI测试"""
+        workflows_dir = os.path.join(self.repo_path, ".github", "workflows")
+        os.makedirs(workflows_dir)
+        workflow_file = os.path.join(workflows_dir, "ci.yml")
+        with open(workflow_file, 'w') as f:
+            f.write("""
+            name: CI
+            jobs:
+              test:
+                steps:
+                  - run: go test ./...
+            """)
+
+        mock_list_files.return_value = [workflow_file]
+
+        result = ci_tests_checker.detect_ci_test_workflows(self.repo_path, "github")
+
+        self.assertIsInstance(result, list)
+        self.assertTrue(result)
+        self.assertEqual(result[0]["tool_name"], "go")
+        self.assertIn("go test", result[0]["snippet"])
+        self.assertEqual(result[0]["file_path"], workflow_file)
+
+    @patch('openchecker.checkers.ci_tests_checker.platform_manager')
+    def test_ci_tests_checker_populates_result(self, mock_platform):
+        """测试ci_tests_checker填充扫描结果"""
+        workflows_dir = os.path.join(self.repo_path, ".github", "workflows")
+        os.makedirs(workflows_dir)
+        workflow_file = os.path.join(workflows_dir, "ci.yml")
+        with open(workflow_file, 'w') as f:
+            f.write("""
+            name: CI
+            jobs:
+              test:
+                steps:
+                  - run: make test
+            """)
+
+        mock_platform.parse_project_url.return_value = ("owner", self.repo_path)
+
+        res_payload = {"scan_results": {}}
+        ci_tests_checker.ci_tests_checker("https://github.com/owner/repo", res_payload)
+
+        result = res_payload["scan_results"]["ci-tests-checker"]
+        self.assertTrue(result["has_ci_tests"])
+        self.assertEqual(result["test_workflows"][0]["tool_name"], "make")
+
+    @patch('openchecker.checkers.ci_tests_checker.platform_manager')
+    def test_ci_tests_checker_without_tests(self, mock_platform):
+        """测试工作流不含测试命令时has_ci_tests为False"""
+        workflows_dir = os.path.join(self.repo_path, ".github", "workflows")
+        os.makedirs(workflows_dir)
+        workflow_file = os.path.join(workflows_dir, "ci.yml")
+        with open(workflow_file, 'w') as f:
+            f.write("""
+            name: CI
+            jobs:
+              build:
+                steps:
+                  - run: echo hello
+            """)
+
+        mock_platform.parse_project_url.return_value = ("owner", self.repo_path)
+
+        res_payload = {"scan_results": {}}
+        ci_tests_checker.ci_tests_checker("https://github.com/owner/repo", res_payload)
+
+        result = res_payload["scan_results"]["ci-tests-checker"]
+        self.assertFalse(result["has_ci_tests"])
+        self.assertEqual(result["test_workflows"], [])
 
 
 class TestSecurityPolicyChecker(unittest.TestCase):
@@ -473,6 +615,7 @@ if __name__ == '__main__':
     
     # 添加测试类
     suite.addTests(loader.loadTestsFromTestCase(TestSASTChecker))
+    suite.addTests(loader.loadTestsFromTestCase(TestCITestsChecker))
     suite.addTests(loader.loadTestsFromTestCase(TestSecurityPolicyChecker))
     suite.addTests(loader.loadTestsFromTestCase(TestTokenPermissionsChecker))
     suite.addTests(loader.loadTestsFromTestCase(TestFuzzingChecker))
