@@ -53,12 +53,12 @@ def _is_owned_action(action_name: str, platform_type: str) -> bool:
 
 def _parse_docker_image(image_ref: str) -> Tuple[str, str]:
     """解析 Docker 镜像引用"""
-    if ':' in image_ref:
-        name, tag = image_ref.rsplit(':', 1)
-        return name, tag
-    elif '@' in image_ref:
+    if '@' in image_ref:
         name, digest = image_ref.split('@', 1)
         return name, digest
+    elif ':' in image_ref.rsplit('/', 1)[-1]:
+        name, tag = image_ref.rsplit(':', 1)
+        return name, tag
     else:
         return image_ref, 'latest'
 
@@ -72,7 +72,7 @@ def _is_commit_hash(ref: str) -> bool:
 def _is_docker_image_pinned(version: str) -> bool:
     """判断 Docker 镜像是否固定到摘要"""
     # 检查是否为 SHA256 摘要
-    return version.startswith('sha256:') and len(version) == 71
+    return re.fullmatch(r'sha256:[a-fA-F0-9]{64}', version) is not None
 
 
 def _is_version_pinned(ref: str) -> bool:
