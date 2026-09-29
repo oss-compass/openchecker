@@ -295,7 +295,7 @@ class GitCodeAdapter(PlatformAdapter):
         """获取GitCode zipball URL"""
         try:
             owner_name, repo_name = self.parse_project_url(project_url)
-            return f"https://raw.gitcode.com/{owner_name}/{repo_name}/archive/refs/heads/{tag}.zip"
+            return f"https://gitcode.com/{owner_name}/{repo_name}/-/archive/{tag}/{repo_name}-{tag}.zip"
         except ValueError:
             return None
             

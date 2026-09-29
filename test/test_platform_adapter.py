@@ -138,7 +138,7 @@ class TestPlatformAdapter(unittest.TestCase):
         project_url = "https://gitcode.com/owner/repo.git"
         tag = "v1.0.0"
         zipball_url = adapter.get_zipball_url(project_url, tag)
-        expected_url = "https://raw.gitcode.com/owner/repo/archive/refs/heads/v1.0.0.zip"
+        expected_url = "https://gitcode.com/owner/repo/-/archive/v1.0.0/repo-v1.0.0.zip"
         self.assertEqual(zipball_url, expected_url)
         
     def test_invalid_url_format(self):
