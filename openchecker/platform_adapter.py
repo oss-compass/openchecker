@@ -371,11 +371,12 @@ class PlatformManager:
         Returns:
             Optional[PlatformAdapter]: 平台适配器实例
         """
-        if "github.com" in project_url:
+        hostname = urlparse(project_url).hostname
+        if hostname in ("github.com", "www.github.com"):
             return self.adapters["github"]
-        elif "gitee.com" in project_url:
+        elif hostname in ("gitee.com", "www.gitee.com"):
             return self.adapters["gitee"]
-        elif "gitcode.com" in project_url:
+        elif hostname in ("gitcode.com", "www.gitcode.com"):
             return self.adapters["gitcode"]
         else:
             return None

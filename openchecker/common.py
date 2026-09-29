@@ -1,6 +1,7 @@
 import subprocess
 from pathlib import Path
 from typing import List, Dict, Tuple, Any
+from urllib.parse import urlparse
 
 def shell_exec(shell_script, param=None):
     """
@@ -30,14 +31,15 @@ def get_platform_type(url):
     """
     根据URL判断代码托管平台类型
     """
-    if "github.com" in url:
+    hostname = urlparse(url).hostname
+    if hostname in ("github.com", "www.github.com"):
         return "github"
-    elif "gitee.com" in url:
+    elif hostname in ("gitee.com", "www.gitee.com"):
         return "gitee"
-    elif "gitcode.com" in url:
+    elif hostname in ("gitcode.com", "www.gitcode.com"):
         return "gitcode"
     else:
-        return "github"
+        return None
     
 
 def list_workflow_files(repo_path: str, platform_type: str) -> List[str]:
