@@ -12,9 +12,9 @@ def bestpractices_checker(project_url: str, res_payload: dict) -> None:
     获取项目的OpenSSF Best Pactices,
     指标详情介绍 https://github.com/ossf/scorecard/blob/main/docs/checks.md#cii-best-practices
     """
-    api_url = f"https://www.bestpractices.dev/projects.json?url={project_url}"
+    api_url = "https://www.bestpractices.dev/projects.json"
     try:
-        response = requests.get(api_url, timeout=10)
+        response = requests.get(api_url, params={"url": project_url}, timeout=10)
         response.raise_for_status()
         
         data = response.json()
