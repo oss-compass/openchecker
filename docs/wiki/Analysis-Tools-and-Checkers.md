@@ -233,6 +233,47 @@ The `url_checker` module provides basic connectivity validation for project URLs
 
 Sources: [openchecker/checkers/url_checker.py L8-L25](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/openchecker/checkers/url_checker.py#L8-L25)
 
+### CI Tests Checker
+
+The `ci_tests_checker` module reports whether a project actually runs tests inside its CI workflows, matching the OSSF Scorecard `CI-Tests` check. It complements the SAST, fuzzing, packaging, pinned-dependencies and dangerous-workflow checkers, none of which answer this question.
+
+Because the check only relies on workflow files discovered through `list_workflow_files()`, it also works for Gitee and GitCode repositories, as well as fully offline scans where the `scorecard-score` command (GitHub-only and dependent on the scorecard binary) cannot run.
+
+* **Command**: `ci-tests-checker`
+* **Discovery**: `platform_manager.parse_project_url()` + `get_platform_type()` + `list_workflow_files()`
+* **Detection**: case-insensitive regexes in `TEST_COMMAND_PATTERNS`, grouped per ecosystem (python, nodejs, java, go, rust, ruby, dotnet, php)
+* **Result**: a summary dictionary written to `res_payload["scan_results"]["ci-tests-checker"]`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `num_workflows` | int | Number of workflow files discovered |
+| `num_workflows_with_tests` | int | Workflows that contain at least one test command |
+| `has_ci_tests` | bool | `True` when at least one workflow runs tests |
+| `workflows` | list | Per-file results (`matched`, `file_path`, `line_number`, `ecosystems`, `matches`) |
+
+```mermaid
+flowchart TD
+
+ProjectURL["project_url"]
+ParseProjectUrl["platform_manager.parse_project_url()"]
+ListWorkflows["list_workflow_files(repo_path, platform_type)"]
+ReadWorkflow["is_ci_test_workflow(file_path)"]
+PatternMatch["_collect_test_command_matches(lines)"]
+Aggregate["num_workflows_with_tests / has_ci_tests"]
+UpdatePayload["res_payload['scan_results']['ci-tests-checker']"]
+
+ProjectURL --> ParseProjectUrl
+ParseProjectUrl --> ListWorkflows
+ListWorkflows --> ReadWorkflow
+ReadWorkflow --> PatternMatch
+PatternMatch --> Aggregate
+Aggregate --> UpdatePayload
+```
+
+The check is resilient by design: a missing, empty or unreadable workflow yields `matched: False` instead of raising, and any failure in the aggregation step stores an `error` entry with zeroed counters so a single bad repository never breaks the agent loop.
+
+Sources: [openchecker/checkers/ci_tests_checker.py](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/openchecker/checkers/ci_tests_checker.py)
+
 ## Security and Compliance Analysis
 
 The security analysis capabilities focus on vulnerability detection, binary file identification, and compliance verification through multiple specialized tools and custom implementations.

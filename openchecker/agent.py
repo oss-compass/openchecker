@@ -21,6 +21,7 @@ from typing import Any, Dict, List
 from checkers.bestpractices_checker import bestpractices_checker
 from checkers.binary_checker import binary_checker
 from checkers.changed_files_checker import changed_files_detector
+from checkers.ci_tests_checker import ci_tests_checker
 from checkers.dangerous_workflow_checker import dangerous_workflow_checker
 from checkers.document_checker import (
     api_doc_checker,
@@ -403,6 +404,7 @@ def _execute_commands(
         'build-doc-checker': lambda: build_doc_checker(project_url, res_payload),
         'readme-opensource-checker': lambda: readme_opensource_checker(project_url, res_payload),
         'bestpractices-checker': lambda: bestpractices_checker(project_url, res_payload),
+        'ci-tests-checker': lambda: ci_tests_checker(project_url, res_payload),
         'dangerous-workflow-checker': lambda: dangerous_workflow_checker(project_url, res_payload),
         'dependency-update-tool-checker': lambda: dependency_update_tool_checker(project_url, res_payload),
         'fuzzing-checker': lambda: fuzzing_checker(project_url, res_payload),

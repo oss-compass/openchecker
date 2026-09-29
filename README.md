@@ -161,6 +161,7 @@ flowchart TD
 | **readme-checker** | 文档完整性检查 | JSON |
 | **maintainers-checker** | 维护者信息验证 | JSON |
 | **languages-detector** | 编程语言识别和统计 | JSON |
+| **ci-tests-checker** | CI 工作流测试执行检测（OSSF Scorecard CI-Tests） | JSON |
 
 ## 📚 核心文档
 
