@@ -161,11 +161,9 @@ def _get_file_patterns(content_type: str) -> List[str]:
         list: List of file matching patterns
     """
     if content_type == "notes":
-        return ["changelog", "releasenotes", "release_notes", "release", "release-notes"]
+        return [r"(?:changelog|releasenotes|release[_-]?notes|release)(?:\.(?:md|markdown|rst|txt))?"]
     elif content_type == "sbom":
-        return [
-            r'(?i).+\.(cdx\.json|cdx\.xml|spdx|spdx\.json|spdx\.xml|spdx\.y[a?]ml|spdx\.rdf|spdx\.rdf\.xml)'
-        ]
+        return [r".+\.(?:cdx\.(?:json|xml)|spdx(?:\.(?:json|xml|ya?ml|rdf(?:\.xml)?))?)"]
     else:
         return []
 
@@ -206,16 +204,10 @@ def _check_zip_contents(zip_url: str, file_patterns: List[str]) -> Tuple[List[st
         
         with zipfile.ZipFile(io.BytesIO(response.content), 'r') as zip_ref:
             found_files = []
-            for file_pattern in file_patterns:
-                if isinstance(file_pattern, str):
-                    for file_name in zip_ref.namelist():
-                        base_name = os.path.basename(file_name).lower()
-                        if base_name == file_pattern.lower():
-                            found_files.append(file_name)
-                else:
-                    for file_name in zip_ref.namelist():
-                        if re.match(file_pattern, file_name):
-                            found_files.append(file_name)
+            for file_name in zip_ref.namelist():
+                base_name = os.path.basename(file_name)
+                if any(re.fullmatch(pattern, base_name, re.IGNORECASE) for pattern in file_patterns):
+                    found_files.append(file_name)
             
             return found_files, None
             
