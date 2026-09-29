@@ -13,6 +13,7 @@ import unittest
 from unittest.mock import Mock, patch, MagicMock, mock_open
 import json
 import os
+import re
 import tempfile
 import shutil
 import yaml
@@ -21,6 +22,7 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from openchecker.checkers import (
+    ci_tests_checker,
     sast_checker,
     security_policy_checker,
     token_permissions_checker,
@@ -407,6 +409,235 @@ class TestSonarChecker(unittest.TestCase):
         # 这里需要根据实际的sonar_checker实现来测试
         # result = sonar_checker._check_sonar_project_exists("test_project", self.test_config["SonarQube"])
         # self.assertTrue(result)
+
+
+class TestCITestsChecker(unittest.TestCase):
+    """CI-Tests检查器测试类"""
+
+    def setUp(self):
+        """测试前置设置"""
+        self.temp_dir = tempfile.mkdtemp()
+        self.repo_path = os.path.join(self.temp_dir, "test_repo")
+        os.makedirs(self.repo_path)
+        self.workflows_dir = os.path.join(self.repo_path, ".github", "workflows")
+        os.makedirs(self.workflows_dir)
+
+    def tearDown(self):
+        """测试后清理"""
+        if os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir)
+
+    def _write_workflow(self, name, content):
+        """在工作流目录中写入一个工作流文件并返回其绝对路径"""
+        file_path = os.path.join(self.workflows_dir, name)
+        with open(file_path, 'w', encoding='utf-8') as handle:
+            handle.write(content)
+        return file_path
+
+    def test_test_command_patterns_cover_all_ecosystems(self):
+        """测试各生态都配置了可编译的测试命令正则"""
+        expected_ecosystems = ["python", "nodejs", "java", "go", "rust", "ruby", "dotnet", "php"]
+
+        for ecosystem in expected_ecosystems:
+            self.assertIn(ecosystem, ci_tests_checker.TEST_COMMAND_PATTERNS)
+            patterns = ci_tests_checker.TEST_COMMAND_PATTERNS[ecosystem]
+            self.assertTrue(patterns, f"{ecosystem} 的测试命令模式不能为空")
+            for pattern in patterns:
+                # 编译失败的正则会在扫描时静默失效，这里显式校验
+                re.compile(pattern)
+
+    def test_collect_test_command_matches_per_ecosystem(self):
+        """测试每个生态的代表性测试命令都能被识别，且每个生态每行只记一次"""
+        cases = [
+            ("        run: pytest -q", "python"),
+            ("        run: python -m unittest discover", "python"),
+            ("        run: tox -e py39", "python"),
+            ("        run: nox", "python"),
+            ("      - run: npm test", "nodejs"),
+            ("      - run: yarn test", "nodejs"),
+            ("      - run: pnpm test", "nodejs"),
+            ("      - run: npx jest --ci", "nodejs"),
+            ("      - run: npx vitest run", "nodejs"),
+            ("      - run: mocha test/**/*.js", "nodejs"),
+            ("      - run: mvn -B test", "java"),
+            ("      - run: gradle test", "java"),
+            ("      - run: sbt test", "java"),
+            ("      - run: go test ./...", "go"),
+            ("      - run: cargo test --all", "rust"),
+            ("      - run: rake test", "ruby"),
+            ("      - run: bundle exec rspec", "ruby"),
+            ("      - run: dotnet test", "dotnet"),
+            ("      - run: phpunit --coverage-text", "php"),
+        ]
+
+        for line, expected_ecosystem in cases:
+            matches = ci_tests_checker._collect_test_command_matches([line])
+            ecosystems = [match["ecosystem"] for match in matches]
+            self.assertIn(expected_ecosystem, ecosystems, msg=f"未识别: {line}")
+            # 同一生态的多个正则命中同一行时只能报告一次
+            self.assertEqual(ecosystems.count(expected_ecosystem), 1, msg=f"重复匹配: {line}")
+
+    def test_collect_test_command_matches_ignores_build_only_workflow(self):
+        """测试只构建/发布的工作流不会误报为测试"""
+        lines = [
+            "name: Release",
+            "on:",
+            "  push:",
+            "    tags: ['v*']",
+            "jobs:",
+            "  publish:",
+            "    runs-on: ubuntu-latest",
+            "    steps:",
+            "      - uses: actions/checkout@v4",
+            "      - run: npm run build",
+            "      - run: docker build -t app .",
+            "      - run: npm publish",
+        ]
+
+        self.assertEqual(ci_tests_checker._collect_test_command_matches(lines), [])
+
+    def test_all_test_command_pattern_and_find_pattern_line(self):
+        """测试合并正则以及行号定位辅助函数"""
+        combined = ci_tests_checker._all_test_command_pattern()
+
+        self.assertTrue(re.search(combined, "      - run: cargo test", re.IGNORECASE))
+        self.assertFalse(re.search(combined, "      - run: npm run build", re.IGNORECASE))
+
+        lines = ["name: CI", "      - run: dotnet test"]
+        self.assertEqual(ci_tests_checker._find_pattern_line(lines, combined), 2)
+        # 未匹配时返回 0，调用方据此区分“没有命中”与“命中第一行”
+        self.assertEqual(ci_tests_checker._find_pattern_line(["name: CI"], r"\bpytest\b"), 0)
+
+    def test_create_workflow_match_defaults_are_independent(self):
+        """测试默认参数不会在多次调用间共享可变对象"""
+        first = ci_tests_checker.create_workflow_match(False, "a.yml", 0)
+        second = ci_tests_checker.create_workflow_match(False, "b.yml", 0)
+
+        self.assertEqual(first["ecosystems"], [])
+        self.assertEqual(first["matches"], [])
+        self.assertEqual(second["ecosystems"], [])
+
+        first["ecosystems"].append("python")
+        self.assertEqual(second["ecosystems"], [])
+
+        detailed = ci_tests_checker.create_workflow_match(
+            matched=True,
+            file_path="ci.yml",
+            line_number=3,
+            ecosystems=["go"],
+            matches=[{"ecosystem": "go", "line_number": 3}],
+        )
+        self.assertTrue(detailed["matched"])
+        self.assertEqual(detailed["ecosystems"], ["go"])
+        self.assertEqual(detailed["matches"][0]["ecosystem"], "go")
+
+    def test_is_ci_test_workflow_detects_tests(self):
+        """测试包含测试命令的工作流会被正向识别"""
+        file_path = self._write_workflow(
+            "ci.yml",
+            "name: CI\non: [push]\njobs:\n  test:\n    steps:\n      - run: pytest -q\n"
+        )
+
+        result = ci_tests_checker.is_ci_test_workflow(file_path)
+
+        self.assertTrue(result["matched"])
+        self.assertEqual(result["file_path"], file_path)
+        self.assertIn("python", result["ecosystems"])
+        self.assertEqual(result["line_number"], 6)
+        self.assertEqual(result["matches"][0]["ecosystem"], "python")
+
+    def test_is_ci_test_workflow_negative(self):
+        """测试只构建/发布的工作流不会被识别为测试"""
+        file_path = self._write_workflow(
+            "release.yml",
+            "name: Release\njobs:\n  publish:\n    steps:\n      - run: npm run build\n"
+        )
+
+        result = ci_tests_checker.is_ci_test_workflow(file_path)
+
+        self.assertFalse(result["matched"])
+        self.assertEqual(result["ecosystems"], [])
+        self.assertEqual(result["matches"], [])
+        self.assertEqual(result["line_number"], 0)
+
+    def test_is_ci_test_workflow_empty_and_missing_files(self):
+        """测试空文件与不存在的文件都返回未匹配且不抛异常"""
+        empty_file = self._write_workflow("empty.yml", "   \n")
+        empty_result = ci_tests_checker.is_ci_test_workflow(empty_file)
+        self.assertFalse(empty_result["matched"])
+        self.assertEqual(empty_result["ecosystems"], [])
+
+        missing_file = os.path.join(self.workflows_dir, "missing.yml")
+        missing_result = ci_tests_checker.is_ci_test_workflow(missing_file)
+        self.assertFalse(missing_result["matched"])
+        self.assertEqual(missing_result["file_path"], missing_file)
+
+    @patch('openchecker.checkers.ci_tests_checker.list_workflow_files')
+    @patch('openchecker.checkers.ci_tests_checker.platform_manager')
+    def test_ci_tests_checker_aggregation(self, mock_platform, mock_list_files):
+        """测试聚合结果：工作流总数、含测试数、总体标志与逐文件生态"""
+        workflow_with_tests = self._write_workflow(
+            "ci.yml",
+            "name: CI\njobs:\n  test:\n    steps:\n      - run: go test ./...\n"
+        )
+        workflow_without_tests = self._write_workflow(
+            "release.yml",
+            "name: Release\njobs:\n  publish:\n    steps:\n      - run: docker push app:latest\n"
+        )
+
+        mock_platform.parse_project_url.return_value = ("owner", "repo")
+        mock_list_files.return_value = [workflow_with_tests, workflow_without_tests]
+
+        res_payload = {"scan_results": {}}
+
+        ci_tests_checker.ci_tests_checker("https://github.com/owner/repo", res_payload)
+
+        result = res_payload["scan_results"]["ci-tests-checker"]
+        self.assertEqual(result["num_workflows"], 2)
+        self.assertEqual(result["num_workflows_with_tests"], 1)
+        self.assertTrue(result["has_ci_tests"])
+        self.assertEqual(len(result["workflows"]), 2)
+
+        by_path = {workflow["file_path"]: workflow for workflow in result["workflows"]}
+        self.assertTrue(by_path[workflow_with_tests]["matched"])
+        self.assertIn("go", by_path[workflow_with_tests]["ecosystems"])
+        self.assertFalse(by_path[workflow_without_tests]["matched"])
+        self.assertEqual(by_path[workflow_without_tests]["ecosystems"], [])
+
+    @patch('openchecker.checkers.ci_tests_checker.list_workflow_files')
+    @patch('openchecker.checkers.ci_tests_checker.platform_manager')
+    def test_ci_tests_checker_without_tests(self, mock_platform, mock_list_files):
+        """测试仓库没有任何测试工作流时 has_ci_tests 为 False"""
+        workflow = self._write_workflow("docs.yml", "name: Docs\njobs:\n  build:\n    steps:\n      - run: make docs\n")
+
+        mock_platform.parse_project_url.return_value = ("owner", "repo")
+        mock_list_files.return_value = [workflow]
+
+        res_payload = {"scan_results": {}}
+
+        ci_tests_checker.ci_tests_checker("https://gitee.com/owner/repo", res_payload)
+
+        result = res_payload["scan_results"]["ci-tests-checker"]
+        self.assertEqual(result["num_workflows"], 1)
+        self.assertEqual(result["num_workflows_with_tests"], 0)
+        self.assertFalse(result["has_ci_tests"])
+
+    @patch('openchecker.checkers.ci_tests_checker.platform_manager')
+    def test_ci_tests_checker_error_path(self, mock_platform):
+        """测试解析项目 URL 失败时写入 error 并归零计数器"""
+        mock_platform.parse_project_url.side_effect = ValueError("invalid project url")
+
+        res_payload = {"scan_results": {}}
+
+        ci_tests_checker.ci_tests_checker("not-a-url", res_payload)
+
+        result = res_payload["scan_results"]["ci-tests-checker"]
+        self.assertIn("error", result)
+        self.assertIn("invalid project url", result["error"])
+        self.assertEqual(result["num_workflows"], 0)
+        self.assertEqual(result["num_workflows_with_tests"], 0)
+        self.assertFalse(result["has_ci_tests"])
+        self.assertEqual(result["workflows"], [])
 
 
 class TestCheckersIntegration(unittest.TestCase):

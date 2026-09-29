@@ -220,6 +220,31 @@ DownloadZip --> UpdateResults
 
 Sources: [openchecker/checkers/release_checker.py L255-L282](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/openchecker/checkers/release_checker.py#L255-L282)
 
+### CI Tests Checker
+
+The `ci_tests_checker` follows the standard Python checker interface and answers the OSSF Scorecard `CI-Tests` question for every platform adapter:
+
+* **Command**: `ci-tests-checker`
+* **Function signature**: `ci_tests_checker(project_url: str, res_payload: dict)`
+* **Result storage**: `res_payload["scan_results"]["ci-tests-checker"]`
+
+Detection is driven by the `TEST_COMMAND_PATTERNS` table, which maps an ecosystem to one or more case-insensitive regexes covering python (`pytest`, `python -m pytest|unittest|nose`, `tox`, `nox`), nodejs (`npm/yarn/pnpm test`, `jest`, `vitest`, `mocha`), java (`mvn test`, `mvn verify`, `gradle test`, `sbt test`), go (`go test`), rust (`cargo test`), ruby (`rake test`, `rspec`, `bundle exec rspec`), dotnet (`dotnet test`) and php (`phpunit`). Build or publish steps such as `npm run build`, `docker push` or `npm publish` intentionally do not match.
+
+Each discovered workflow is read with `encoding='utf-8', errors='ignore'` and scanned line by line. `_collect_test_command_matches()` reports one entry per ecosystem per matching line, so a step like `python -m pytest` is counted once for python even though it satisfies several regexes.
+
+The aggregated result is a summary dictionary rather than a bare list:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `num_workflows` | int | Number of workflow files discovered |
+| `num_workflows_with_tests` | int | Workflows containing at least one test command |
+| `has_ci_tests` | bool | `True` when `num_workflows_with_tests > 0` |
+| `workflows` | list | Per-file match results |
+
+Failures are handled the same way as other checkers in `command_switch`: the aggregation wraps discovery in a try/except and stores `{"error": str(e)}` together with zeroed counters, while `is_ci_test_workflow()` returns `matched: False` for missing, empty or unreadable files.
+
+Sources: [openchecker/checkers/ci_tests_checker.py](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/openchecker/checkers/ci_tests_checker.py)
+
 ## Shell Script Command Execution
 
 External tools are executed via shell scripts defined in the `shell_script_handlers` dictionary. This approach provides flexibility for integrating diverse analysis tools with different command-line interfaces.
