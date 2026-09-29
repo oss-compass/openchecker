@@ -67,9 +67,9 @@ def analyze_security_policy_content(file_path: str) -> Dict:
         }
     
     # 正则表达式模式（与Go版本保持一致）
-    url_pattern = r'(http|https)://[a-zA-Z0-9./?=_%:-]*'
+    url_pattern = r'https?://[^\s<>)\]"]+'
     email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,6}\b'
-    disclosure_pattern = r'(?i)(\b*[0-9]{1,4}\b|(Disclos|Vuln))'
+    disclosure_pattern = r'(?i)\b(?:[0-9]{1,4}|disclos\w*|vuln\w*)\b'
     
     # 提取信息
     urls = re.findall(url_pattern, content)
