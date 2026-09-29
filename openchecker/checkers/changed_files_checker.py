@@ -21,24 +21,19 @@ def changed_files_detector(project_url: str, res_payload: dict, commit_hash: str
         res_payload["scan_results"]["changed-files-since-commit-detector"] = {"error": "No commit hash provided"}
         return
     
-    context_path = os.getcwd()
-    try:
-        repository_path = os.path.join(context_path, os.path.splitext(os.path.basename(urlparse(project_url).path))[0])
-        os.chdir(repository_path)
-        logger.info(f"change os path to git repository directory: {repository_path}")
-    except OSError as e:
-        logger.error(f"failed to change os path to git repository directory: {e}")
-        res_payload["scan_results"]["changed-files-since-commit-detector"] = {"error": str(e)}
+    repository_path = os.path.join(os.getcwd(), os.path.splitext(os.path.basename(urlparse(project_url).path))[0])
+    if not os.path.isdir(repository_path):
+        error = f"Repository directory does not exist: {repository_path}"
+        logger.error(error)
+        res_payload["scan_results"]["changed-files-since-commit-detector"] = {"error": error}
         return
 
     # Get different types of changed files
-    changed_files = _get_diff_files(commit_hash, "ACDMRTUXB")
-    new_files = _get_diff_files(commit_hash, "A")
-    rename_files = _get_diff_files(commit_hash, "R")
-    deleted_files = _get_diff_files(commit_hash, "D")
-    modified_files = _get_diff_files(commit_hash, "M")
-
-    os.chdir(context_path)
+    changed_files = _get_diff_files(commit_hash, "ACDMRTUXB", repository_path)
+    new_files = _get_diff_files(commit_hash, "A", repository_path)
+    rename_files = _get_diff_files(commit_hash, "R", repository_path)
+    deleted_files = _get_diff_files(commit_hash, "D", repository_path)
+    modified_files = _get_diff_files(commit_hash, "M", repository_path)
 
     res_payload["scan_results"]["changed-files-since-commit-detector"] = {
         "changed_files": changed_files,
@@ -51,7 +46,7 @@ def changed_files_detector(project_url: str, res_payload: dict, commit_hash: str
     logger.info(f"changed-files-since-commit-detector job done: {project_url}")
 
 
-def _get_diff_files(commit_hash: str, type: str = "ACDMRTUXB") -> List[str]:
+def _get_diff_files(commit_hash: str, type: str = "ACDMRTUXB", repository_path: str = ".") -> List[str]:
     """
     Get changed files of specified type
     
@@ -67,7 +62,7 @@ def _get_diff_files(commit_hash: str, type: str = "ACDMRTUXB") -> List[str]:
     """
     try:
         result = subprocess.check_output(
-            ["git", "diff", "--name-only", f"--diff-filter={type}", f"{commit_hash}..HEAD"],
+            ["git", "-C", repository_path, "diff", "--name-only", f"--diff-filter={type}", f"{commit_hash}..HEAD"],
             stderr=subprocess.STDOUT,
             text=True
         )
