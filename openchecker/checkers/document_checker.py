@@ -85,6 +85,7 @@ def check_doc_content(project_url: str, doc_type: str) -> Tuple[List[str], str]:
 
             external_build_doc_link = "https://gitee.com/openharmony-tpc/docs/blob/master/OpenHarmony_har_usage.md"
             if do_link_include_check and external_build_doc_link.lower() in chunk.lower():
+                satisfied_doc_file.append(document)
                 return satisfied_doc_file, None
 
             result = completion_with_backoff(messages=messages, temperature=0.2)
