@@ -16,41 +16,39 @@ def get_webhooks(project_url, access_token):
     repo_name = re.sub(r'\.git$', '', os.path.basename(project_url))
 
     if "github.com" in project_url:
-        url = f"https://api.github.com/repos/{owner_name}/{repo_name}/hooks?&page=1&per_page=100"
-        try:
-            headers = {
-                'Accept': 'application/vnd.github.v3+json',
-                'Authorization': f'token {access_token}'
-            }
-            response = requests.get(url, headers=headers)
-            if response.status_code == 200:
-                hooks = response.json()
-                return hooks, None
-            else:
-                return [], "token invalid"
-        except Exception as e:
-            return [], "token invalid"
-
+        base_url = f"https://api.github.com/repos/{owner_name}/{repo_name}/hooks"
+        headers = {
+            'Accept': 'application/vnd.github.v3+json',
+            'Authorization': f'token {access_token}'
+        }
+        token_query = ""
     elif "gitee.com" in project_url or "gitcode.com" in project_url:
-        if "gitee.com" in project_url:
-            url = f"https://gitee.com/api/v5/repos/{owner_name}/{repo_name}/hooks?access_token={access_token}&page=1&per_page=100"
-        else:
-            url = f"https://api.gitcode.com/api/v5/repos/{owner_name}/{repo_name}/hooks?access_token={access_token}&page=1&per_page=100"
-        try:
-            headers = {
-                'Accept': 'application/json'
-            }
-            response = requests.get(url, headers=headers)
-            if response.status_code == 200:
-                hooks = response.json()
-                return hooks, None
-            else:
-                return [], "token invalid"
-        except Exception as e:
-            return [], "token invalid"
-
+        host = "gitee.com" if "gitee.com" in project_url else "api.gitcode.com"
+        base_url = f"https://{host}/api/v5/repos/{owner_name}/{repo_name}/hooks"
+        headers = {'Accept': 'application/json'}
+        token_query = f"access_token={access_token}&"
     else:
         return [], "Not supported platform."
+
+    hooks = []
+    page = 1
+    try:
+        while True:
+            url = f"{base_url}?{token_query}page={page}&per_page=100"
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code != 200:
+                return [], f"Failed to fetch webhooks: HTTP {response.status_code}"
+            page_hooks = response.json()
+            if not isinstance(page_hooks, list):
+                return [], "Invalid webhook response"
+            hooks.extend(page_hooks)
+            if len(page_hooks) < 100:
+                return hooks, None
+            page += 1
+    except requests.RequestException as e:
+        return [], f"Failed to fetch webhooks: {e}"
+    except ValueError:
+        return [], "Invalid webhook response"
 
 
 def webhooks_checker(project_url: str, res_payload: dict, access_token: str) -> None:
