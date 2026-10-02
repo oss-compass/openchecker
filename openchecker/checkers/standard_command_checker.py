@@ -171,7 +171,7 @@ def get_package_info(project_url: str) -> Tuple[Dict, str]:
             down_count = 0
             for ch in last_month:
                 down_count += ch['downloads']
-            day_enter = last_month[0]['day'] + " - " + last_month[len(last_month) - 1]['day']   
+            day_enter = (last_month[0]['day'] + " - " + last_month[-1]['day']) if last_month else ""
             return {
                 "description": description, 
                 "home_url": home_url, 
@@ -179,9 +179,12 @@ def get_package_info(project_url: str) -> Tuple[Dict, str]:
                 "down_count": down_count, 
                 "day_enter": day_enter
             }, None
-        elif response.status_code == 404:
-            logger.error("Failed to get down_count for package: {} \n Error: Not found".format(package_name))
-            return {"description": False, "home_url": False, "dependent_count": False, "down_count": False, "day_enter": False}, "Not found"
+        else:
+            error = f"Failed to get download stats: HTTP {response_down.status_code}"
+            logger.error("%s for package %s", error, package_name)
+            return {"description": description, "home_url": home_url,
+                    "dependent_count": dependent_count, "down_count": False,
+                    "day_enter": False}, error
     else:
         # Use platform adapter to get repo info
         try:
