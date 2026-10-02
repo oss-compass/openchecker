@@ -162,7 +162,12 @@ def _parse_package_json(package_file: Path) -> List[Dict[str, Any]]:
             deps = data.get(dep_type, {})
             for name, version in deps.items():
                 # 判断是否固定到精确版本
-                is_pinned = not any(char in version for char in ['^', '~', '>', '<', '*'])
+                # A tag, range, local path, or branch can move even when it
+                # contains none of the usual range operators.
+                is_pinned = isinstance(version, str) and re.fullmatch(
+                    r'(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)'
+                    r'(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?', version
+                ) is not None
                 
                 dep = create_dependency(
                     name=name,
