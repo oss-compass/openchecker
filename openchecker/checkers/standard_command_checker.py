@@ -124,7 +124,8 @@ def get_code_count(project_url: str) -> Tuple[Dict, str]:
         if result.stdout.strip() == "":
             return {"code_count": 0}, None
         result_json = json.loads(result.stdout)
-        code_count = result_json['SUM']['code']
+        # cloc omits SUM when a repository has no recognized source files.
+        code_count = result_json.get('SUM', {}).get('code', 0)
         return {"code_count": code_count}, None
     else:
         return None, "Failed to get code count."
