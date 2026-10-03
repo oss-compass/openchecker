@@ -294,8 +294,7 @@ def _collect_docker_dependencies(repo_path: Path) -> List[Dict[str, Any]]:
     """收集 Docker 文件中的依赖"""
     dependencies = []
     
-    # 查找 Dockerfile 和 docker-compose.yml
-    docker_files = list(repo_path.rglob("Dockerfile*")) + list(repo_path.rglob("docker-compose*.yml"))
+    docker_files = list(repo_path.rglob("Dockerfile*"))
     
     for docker_file in docker_files:
         try:
@@ -332,6 +331,28 @@ def _collect_docker_dependencies(repo_path: Path) -> List[Dict[str, Any]]:
         except Exception as e:
             pass
             
+    compose_files = set()
+    for pattern in ("docker-compose*.yml", "docker-compose*.yaml", "compose*.yml", "compose*.yaml"):
+        compose_files.update(repo_path.rglob(pattern))
+    for compose_file in compose_files:
+        try:
+            with open(compose_file, 'r', encoding='utf-8') as f:
+                data = yaml.safe_load(f)
+            services = data.get('services', {}) if isinstance(data, dict) else {}
+            if not isinstance(services, dict):
+                continue
+            for service in services.values():
+                if not isinstance(service, dict) or not isinstance(service.get('image'), str):
+                    continue
+                image_ref = service['image']
+                name, version = _parse_docker_image(image_ref)
+                dependencies.append(create_dependency(
+                    name=name, version=version, dep_type=DEPENDENCY_TYPE_DOCKER_IMAGE,
+                    file_path=str(compose_file), line_number=0,
+                    is_pinned=_is_version_pinned(version), snippet=image_ref
+                ))
+        except (OSError, yaml.YAMLError):
+            continue
     return dependencies
 
 
