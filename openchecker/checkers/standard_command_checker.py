@@ -30,20 +30,20 @@ def run_criticality_score(project_url: str) -> Tuple[Dict, str]:
         cmd = ["criticality_score", "--repo", project_url, "--format", "json"]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
-            json_str = result.stderr
-            json_str = json_str.replace("\n", "")
-            pattern = r'{.*?}'
-            match = re.search(pattern, json_str)
-            json_res = {}
-            if match:
-                json_score = match.group()
-                try:
-                    json_res = json.loads(json_score)
-                    criticality_score = json_res['criticality_score']
-                except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse criticality score JSON: {e}")
-                    return None, "Failed to parse criticality score JSON."
-                return {"criticality_score": criticality_score}, None
+            decoder = json.JSONDecoder()
+            for output in (result.stdout, result.stderr):
+                for match in re.finditer(r'\{', output):
+                    # The Python CLI logs JSON to stderr, while other builds
+                    # write it to stdout. Ignore surrounding log messages.
+                    json_str = output[match.start():]
+                    try:
+                        json_res, _ = decoder.raw_decode(json_str)
+                    except json.JSONDecodeError:
+                        continue
+                    if isinstance(json_res, dict) and 'criticality_score' in json_res:
+                        return {"criticality_score": json_res['criticality_score']}, None
+            logger.error("Criticality score command returned no valid score")
+            return None, "Failed to parse criticality score JSON."
         else:
             logger.error(f"Criticality score command failed: {result.stderr}")
             return None, "Criticality score command failed."
