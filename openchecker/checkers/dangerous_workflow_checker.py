@@ -97,7 +97,7 @@ def check_untrusted_checkout(workflow: Dict[str, Any], file_path: str, platform_
             
             # 检查是否使用 actions/checkout
             uses = step.get('uses', '')
-            if not isinstance(uses, str) or 'actions/checkout' not in uses:
+            if not isinstance(uses, str) or not re.fullmatch(r'actions/checkout@[^\s]+', uses.strip(), re.IGNORECASE):
                 continue
             
             # 检查 ref 参数
