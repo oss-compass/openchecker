@@ -1,4 +1,5 @@
 import re
+import yaml
 from typing import List, Dict, Tuple, Any
 from pathlib import Path
 from common import get_platform_type, list_workflow_files
@@ -45,7 +46,30 @@ def _find_pattern_line(lines: List[str], pattern: str) -> int:
     for i, line in enumerate(lines):
         if re.search(pattern, line, re.IGNORECASE):
             return i + 1
+    if pattern.startswith('run:.*'):
+        command_pattern = pattern[len('run:.*'):]
+        for i, line in enumerate(lines):
+            if re.search(command_pattern, line, re.IGNORECASE):
+                return i + 1
     return 1
+
+
+def _include_multiline_commands(content: str) -> str:
+    """Expose YAML block commands to the existing publish patterns."""
+    try:
+        workflow = yaml.safe_load(content)
+    except yaml.YAMLError:
+        return content
+    if not isinstance(workflow, dict) or not isinstance(workflow.get('jobs'), dict):
+        return content
+    command_lines = []
+    for job in workflow['jobs'].values():
+        if not isinstance(job, dict) or not isinstance(job.get('steps'), list):
+            continue
+        for step in job['steps']:
+            if isinstance(step, dict) and isinstance(step.get('run'), str):
+                command_lines.append('run: ' + ' '.join(step['run'].split()))
+    return content + '\n' + '\n'.join(command_lines)
 
 
 def create_workflow_match(matched: bool, file_path: str, line_number: int) -> Dict[str, Any]:
@@ -141,10 +165,11 @@ def is_packaging_workflow(file_path: str) -> Dict[str, Any]:
             content = f.read()
         
         lines = content.split('\n')
+        searchable_content = _include_multiline_commands(content)
         
         # 检查每个打包模式
         for pattern_group in packaging_patterns:
-            if _match_pattern_group(content, lines, pattern_group):
+            if _match_pattern_group(searchable_content, lines, pattern_group):
                 line_num = _find_pattern_line(lines, list(pattern_group.values())[0])
                 return create_workflow_match(
                     matched=True,
