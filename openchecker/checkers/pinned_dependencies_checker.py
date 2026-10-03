@@ -123,14 +123,16 @@ def _parse_requirements_file(req_file: Path) -> List[Dict[str, Any]]:
             if not line or line.startswith('#'):
                 continue
             
-            # 解析包名和版本
-            match = re.match(r'^([a-zA-Z0-9\-_\.]+)([>=<~!]+.*)?', line)
+            # Ignore an environment marker or inline comment when checking
+            # whether the version requirement is exact.
+            requirement = line.split(' #', 1)[0].split(';', 1)[0].strip()
+            match = re.match(r'^([a-zA-Z0-9._-]+)(?:\s*\[[^]]+\])?\s*(.*)$', requirement)
             if match:
                 name = match.group(1)
-                version_spec = match.group(2) or ""
+                version_spec = match.group(2).strip()
                 
                 # 判断是否固定到精确版本
-                is_pinned = '==' in version_spec and not any(op in version_spec for op in ['>=', '<=', '>', '<', '~', '!'])
+                is_pinned = re.fullmatch(r'==\s*[^=<>!~,\s*]+', version_spec) is not None
                 
                 dep = create_dependency(
                     name=name,
