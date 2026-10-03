@@ -36,7 +36,8 @@ def binary_checker(project_url: str, res_payload: dict) -> None:
             res_payload["scan_results"]["binary-checker"] = binary_result
         else:
             logger.error(f"binary-checker job failed: {project_url}, error: {error}")
-            res_payload["scan_results"]["binary-checker"] = {"error": error.decode("utf-8")}
+            error_text = error.decode("utf-8", errors="replace") if isinstance(error, bytes) else str(error)
+            res_payload["scan_results"]["binary-checker"] = {"error": error_text}
     except Exception as e:
         logger.error(f"binary-checker job failed: {project_url}, error: {e}")
-        res_payload["scan_results"]["binary-checker"] = {"error": str(e)} 
+        res_payload["scan_results"]["binary-checker"] = {"error": str(e)}
