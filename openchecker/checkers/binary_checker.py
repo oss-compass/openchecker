@@ -24,10 +24,9 @@ def binary_checker(project_url: str, res_payload: dict) -> None:
             logger.info(f"binary-checker job done: {project_url}")
             # Process special output format of binary checker
             result_str = result.decode('utf-8') if result else ""
-            data_list = result_str.split('\n')
             binary_file_list = []
             binary_archive_list = []
-            for data in data_list[:-1]:
+            for data in result_str.splitlines():
                 if "Binary file found:" in data:
                     binary_file_list.append(data.split(": ")[1])
                 elif "Binary archive found:" in data:
@@ -39,4 +38,4 @@ def binary_checker(project_url: str, res_payload: dict) -> None:
             res_payload["scan_results"]["binary-checker"] = {"error": error.decode("utf-8")}
     except Exception as e:
         logger.error(f"binary-checker job failed: {project_url}, error: {e}")
-        res_payload["scan_results"]["binary-checker"] = {"error": str(e)} 
+        res_payload["scan_results"]["binary-checker"] = {"error": str(e)}
