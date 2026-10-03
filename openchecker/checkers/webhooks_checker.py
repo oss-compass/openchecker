@@ -1,6 +1,5 @@
-import re
 import requests
-import os
+from urllib.parse import urlsplit
 from typing import Any, List, Dict
 
 
@@ -12,10 +11,22 @@ def get_webhooks(project_url, access_token):
     获取所有仓库webhooks, 支持github.com, gitee.com, gitcode.com。
     """
 
-    owner_name = re.match(r"https://(?:github|gitee|gitcode).com/([^/]+)/", project_url).group(1)
-    repo_name = re.sub(r'\.git$', '', os.path.basename(project_url))
+    try:
+        parsed = urlsplit(project_url)
+        host = parsed.hostname
+    except ValueError:
+        return [], "Invalid project URL format"
+    if parsed.scheme != 'https' or host not in {'github.com', 'www.github.com', 'gitee.com', 'gitcode.com'}:
+        return [], "Not supported platform."
+    path_parts = parsed.path.strip('/').split('/')
+    if len(path_parts) != 2 or not all(path_parts):
+        return [], "Invalid project URL format"
+    owner_name, repo_name = path_parts
+    repo_name = repo_name.removesuffix('.git')
+    if not repo_name:
+        return [], "Invalid project URL format"
 
-    if "github.com" in project_url:
+    if host in {'github.com', 'www.github.com'}:
         url = f"https://api.github.com/repos/{owner_name}/{repo_name}/hooks?&page=1&per_page=100"
         try:
             headers = {
@@ -31,8 +42,8 @@ def get_webhooks(project_url, access_token):
         except Exception as e:
             return [], "token invalid"
 
-    elif "gitee.com" in project_url or "gitcode.com" in project_url:
-        if "gitee.com" in project_url:
+    elif host in {'gitee.com', 'gitcode.com'}:
+        if host == 'gitee.com':
             url = f"https://gitee.com/api/v5/repos/{owner_name}/{repo_name}/hooks?access_token={access_token}&page=1&per_page=100"
         else:
             url = f"https://api.gitcode.com/api/v5/repos/{owner_name}/{repo_name}/hooks?access_token={access_token}&page=1&per_page=100"
