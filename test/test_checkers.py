@@ -217,7 +217,7 @@ class TestTokenPermissionsChecker(unittest.TestCase):
         self.assertTrue(len(result) > 0)
         
         # 检查权限项
-        permission_names = [p["permission"] for p in result]
+        permission_names = [p["name"] for p in result]
         self.assertIn("contents", permission_names)
         self.assertIn("actions", permission_names)
 
@@ -483,4 +483,4 @@ if __name__ == '__main__':
     
     # 运行测试
     runner = unittest.TextTestRunner(verbosity=2)
-    runner.run(suite) 
+    runner.run(suite)

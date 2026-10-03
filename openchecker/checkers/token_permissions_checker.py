@@ -60,6 +60,17 @@ def _extract_top_level_permissions(workflow: Dict, file_path: str) -> List[Dict[
         return permissions
     
     perms = workflow["permissions"]
+
+    if perms == {}:
+        permissions.append({
+            "file_path": file_path,
+            "location_type": PERMISSION_LOCATION_TOP,
+            "name": None,
+            "value": {},
+            "permission_level": PERMISSION_LEVEL_NONE,
+            "line_number": 1
+        })
+        return permissions
     
     # 处理简化的权限声明 (如 permissions: write-all)
     if isinstance(perms, str):
@@ -118,6 +129,18 @@ def _extract_job_level_permissions(workflow: Dict, file_path: str) -> List[Dict[
             continue
         
         job_perms = job_config["permissions"]
+
+        if job_perms == {}:
+            permissions.append({
+                "file_path": file_path,
+                "location_type": PERMISSION_LOCATION_JOB,
+                "name": None,
+                "value": {},
+                "permission_level": PERMISSION_LEVEL_NONE,
+                "line_number": 1,
+                "job_name": job_name
+            })
+            continue
         
         # 处理简化权限声明
         if isinstance(job_perms, str):
@@ -194,16 +217,15 @@ def token_permissions_checker(project_url: str, res_payload: dict) -> None:
     
     owner_name, repo_path = platform_manager.parse_project_url(project_url)
     platform_type = get_platform_type(project_url)
+    workflow_files = list_workflow_files(repo_path, platform_type)
     results = {
-        "num_workflows": 0,
+        "num_workflows": len(workflow_files),
         "token_permissions": []
     }
-    workflow_files = list_workflow_files(repo_path, platform_type)
     
     for workflow_file in workflow_files:
         permissions = _extract_workflow_permissions(workflow_file, repo_path)
         if permissions:
-            results["num_workflows"] += 1
             results["token_permissions"].extend(permissions)
     
     res_payload["scan_results"][COMMAND] = results
