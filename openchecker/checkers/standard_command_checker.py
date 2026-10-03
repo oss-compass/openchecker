@@ -293,7 +293,7 @@ def get_type_countries(project_url, type) -> Tuple[Dict, str]:
             return False, "Unsupported platform"
     except Exception as e:
         logger.error("get_{}_countries error: {}".format(type, e))
-        return False, None
+        return False, str(e)
 
 def get_type_organizations(project_url, type)  -> Tuple[Dict, str]:
     """
@@ -325,7 +325,7 @@ def get_type_organizations(project_url, type)  -> Tuple[Dict, str]:
             return False, "Unsupported platform"
     except Exception as e:
         logger.error("get_{}_organizations error: {}".format(type, e))
-        return False, None
+        return False, str(e)
 
 def get_eol_info(project_url: str) -> Tuple[Dict, str]:
     """
