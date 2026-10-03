@@ -255,7 +255,7 @@ def _collect_actions(repo_path: Path, platform_type: str) -> List[Dict[str, Any]
             # 解析工作流中的 uses 字段
             lines = content.split('\n')
             for line_num, line in enumerate(lines, 1):
-                uses_match = re.search(r'uses:\s*([^\s#]+)', line)
+                uses_match = re.match(r'^\s*(?:-\s*)?uses:\s*([^\s#]+)', line)
                 if uses_match:
                     action_ref = uses_match.group(1).strip()
                     
