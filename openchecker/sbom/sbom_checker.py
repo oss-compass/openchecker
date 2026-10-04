@@ -13,6 +13,10 @@ from logger import get_logger
 
 logger = get_logger('openchecker.sbom.sbom_checker')
 
+SBOM_FILE_PATTERN = re.compile(
+    r'(?i).+\.(cdx\.json|cdx\.xml|spdx|spdx\.json|spdx\.xml|spdx\.ya?ml|spdx\.rdf|spdx\.rdf\.xml)'
+)
+
 
 class FileType(Enum):
     """文件类型枚举"""
@@ -113,9 +117,7 @@ class SBOMChecker:
     
     def __init__(self):
         # SBOM文件正则表达式
-        self.sbom_file_pattern = re.compile(
-            r'(?i).+\.(cdx\.json|cdx\.xml|spdx|spdx\.json|spdx\.xml|spdx\.y[a?]ml|spdx\.rdf|spdx\.rdf\.xml)'
-        )
+        self.sbom_file_pattern = SBOM_FILE_PATTERN
         # 根文件正则表达式
         self.root_file_pattern = re.compile(r'^[^.]([^//]*)$')
         # 发布查找回退数量
@@ -178,7 +180,7 @@ class SBOMChecker:
 
     def _is_sbom_file(self, file_path: str) -> bool:
         """判断是否为SBOM文件"""
-        return (self.sbom_file_pattern.match(file_path) and 
+        return (self.sbom_file_pattern.fullmatch(file_path) and
                 self.root_file_pattern.match(file_path))
 
     def _check_sbom_releases(self, releases: List[Release]) -> List[SBOM]:
@@ -190,7 +192,7 @@ class SBOMChecker:
                 break
                 
             for asset in release.assets:
-                if not self.sbom_file_pattern.match(asset.get('name', '')):
+                if not self.sbom_file_pattern.fullmatch(asset.get('name', '')):
                     continue
                     
                 found_sboms.append(SBOM(
@@ -389,7 +391,7 @@ def check_sbom_for_project(project_url: str) -> Dict[str, Any]:
                 relative_path = os.path.relpath(file_path, project_name)
                 
                 # 检查是否为SBOM文件
-                if re.match(r'(?i).+\.(cdx\.json|cdx\.xml|spdx|spdx\.json|spdx\.xml|spdx\.y[a?]ml|spdx\.rdf|spdx\.rdf\.xml)', file):
+                if SBOM_FILE_PATTERN.fullmatch(file):
                     sbom_files.append({
                         "name": relative_path,
                         "path": file_path,
