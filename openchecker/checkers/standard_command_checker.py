@@ -261,7 +261,7 @@ def get_ohpm_info(project_url: str) -> Tuple[Dict, str]:
             return {"down_count": False, "dependent": False, "bedependent": False}, "Not found"
     except Exception as e:
         logger.error("get_ohpm_info  error: {}".format(e))
-        return {"down_count": "", "dependent": "", "bedependent": ""}, None
+        return {"down_count": "", "dependent": "", "bedependent": ""}, str(e)
 
 def get_type_countries(project_url, type) -> Tuple[Dict, str]:
     """
