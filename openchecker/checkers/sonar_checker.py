@@ -336,6 +336,15 @@ def _query_sonar_measures(project_name: str, sonar_config: dict) -> dict:
                     if current_task and current_task.get("status") == "IN_PROGRESS":
                         logger.info(f"Background task in progress, waiting... ({elapsed_time}s)")
                         continue
+
+                    if current_task and current_task.get("status") in ("FAILED", "CANCELED"):
+                        status = current_task["status"]
+                        error = f"SonarQube background task {status.lower()}"
+                        logger.error(error)
+                        return {
+                            "error": error,
+                            "analysis_error": {"status": status, "task": current_task}
+                        }
                     
                     # 任务完成
                     logger.info("Background task completed")

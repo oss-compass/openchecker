@@ -131,6 +131,16 @@ pytest -x
 pytest --lf
 ```
 
+### SonarQube 后台分析失败回归
+
+在仓库根目录运行：
+
+```bash
+PYTHONPATH=openchecker python -m unittest discover -s test -p test_sonar_failed_analysis.py -v
+```
+
+测试模拟 SonarQube HTTP 响应并跳过轮询等待，验证失败或取消的后台任务不会返回旧度量值，同时覆盖成功任务、队列优先处理和扫描结果中的错误信息。无需连接 SonarQube，也不执行扫描器或真实构建。
+
 ## 测试覆盖率
 
 ### 查看覆盖率
