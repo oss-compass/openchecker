@@ -150,7 +150,7 @@ def check_signed_release(project_url: str) -> Tuple[Dict, str]:
     return {"is_released": bool(results), "signed_files": results}, None
 
 
-def _get_file_patterns(content_type: str) -> List[str]:
+def _get_file_patterns(content_type: str) -> List[Any]:
     """
     Get file matching patterns based on content type.
     
@@ -164,7 +164,7 @@ def _get_file_patterns(content_type: str) -> List[str]:
         return ["changelog", "releasenotes", "release_notes", "release", "release-notes"]
     elif content_type == "sbom":
         return [
-            r'(?i).+\.(cdx\.json|cdx\.xml|spdx|spdx\.json|spdx\.xml|spdx\.y[a?]ml|spdx\.rdf|spdx\.rdf\.xml)'
+            re.compile(r'.+\.(cdx\.json|cdx\.xml|spdx|spdx\.json|spdx\.xml|spdx\.ya?ml|spdx\.rdf|spdx\.rdf\.xml)$', re.IGNORECASE)
         ]
     else:
         return []
@@ -186,7 +186,7 @@ def _get_zipball_url(project_url: str, owner_name: str, repo_name: str, tag: str
     return platform_manager.get_zipball_url(project_url, tag)
 
 
-def _check_zip_contents(zip_url: str, file_patterns: List[str]) -> Tuple[List[str], str]:
+def _check_zip_contents(zip_url: str, file_patterns: List[Any]) -> Tuple[List[str], str]:
     """
     Check contents in zip file.
     
@@ -214,7 +214,7 @@ def _check_zip_contents(zip_url: str, file_patterns: List[str]) -> Tuple[List[st
                             found_files.append(file_name)
                 else:
                     for file_name in zip_ref.namelist():
-                        if re.match(file_pattern, file_name):
+                        if file_pattern.search(os.path.basename(file_name)):
                             found_files.append(file_name)
             
             return found_files, None
@@ -279,4 +279,4 @@ def release_checker(project_url: str, res_payload: dict) -> None:
         res_payload["scan_results"]["release-checker"]["signed-release-checker"] = signed_release_result
     else:
         logger.error(f"signed-release-checker job failed: {project_url}, error: {error}")
-        res_payload["scan_results"]["release-checker"]["signed-release-checker"] = {"error": error} 
+        res_payload["scan_results"]["release-checker"]["signed-release-checker"] = {"error": error}
