@@ -31,7 +31,8 @@ def is_untrusted_ref(ref: str, platform_type: str) -> bool:
     untrusted_patterns = [
         f"{platform_type}.event.pull_request.head",
         f"{platform_type}.event.pull_request",
-        f"{platform_type}.event.workflow_run"
+        f"{platform_type}.event.workflow_run",
+        f"{platform_type}.head_ref"
     ]
     
     return any(pattern in ref for pattern in untrusted_patterns)
