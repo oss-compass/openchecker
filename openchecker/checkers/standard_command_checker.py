@@ -354,7 +354,7 @@ def get_eol_info(project_url: str) -> Tuple[Dict, str]:
         return {"eol_status": "", "eol_release": "", "eol_time": ""}, None 
     except Exception as e:
         logger.error("eol_info error: {}".format(e))
-        return {"eol_status": "", "eol_release": "", "eol_time": ""}, None
+        return {"eol_status": "", "eol_release": "", "eol_time": ""}, str(e)
 
 def criticality_score_checker(project_url: str, res_payload: dict) -> None:
     """
