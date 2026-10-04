@@ -23,4 +23,4 @@ def bestpractices_checker(project_url: str, res_payload: dict) -> None:
         else:
             res_payload["scan_results"][COMMAND] = {}
     except Exception as e:
-        res_payload["scan_results"][COMMAND] = {}
+        res_payload["scan_results"][COMMAND] = {"error": str(e)}
