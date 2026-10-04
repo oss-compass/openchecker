@@ -131,6 +131,16 @@ pytest -x
 pytest --lf
 ```
 
+### 变更文件路径回归
+
+在仓库根目录运行：
+
+```bash
+PYTHONPATH=openchecker python -m unittest discover -s test -p test_changed_file_paths.py -v
+```
+
+测试在临时 Git 仓库中创建提交，通过检测器验证新增、修改、重命名、删除和无变更结果，覆盖中文、控制字符、引号、反斜杠及首尾空格文件名。测试不访问远端仓库；Windows 不支持这些 POSIX 文件名，因此会跳过。
+
 ## 测试覆盖率
 
 ### 查看覆盖率
