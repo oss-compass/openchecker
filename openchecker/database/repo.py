@@ -91,23 +91,20 @@ def get_generator(client, body, index=None):
             return []
         
         scroll_id = page["_scroll_id"]
-        total = page['hits']['total']
-        scroll_size = total['value'] if isinstance(total, dict) else total
-
-        if scroll_size == 0:
+        try:
+            while page['hits']['hits']:
+                for item in page['hits']['hits']:
+                    yield item
+                page = get_items(client=client, index=index, body=body,
+                                 size=page_size, scroll_id=scroll_id)
+                if not page:
+                    break
+                # Elasticsearch may return a new ID for each batch, including
+                # the final empty batch. Use it for both paging and cleanup.
+                scroll_id = page.get("_scroll_id", scroll_id)
+        finally:
             free_scroll(client, scroll_id)
-            return []
 
-        while scroll_size > 0:
-
-            for item in page['hits']['hits']:
-                yield item
-            page = get_items(client=client, index=index, body=body, size=page_size, scroll_id=scroll_id)
-            if not page:
-                break
-
-            scroll_size = len(page['hits']['hits'])
-        free_scroll(client, scroll_id)
 
 def check_repo_china(client, repo):
     repo_tz_index = "github_event_repository_enrich"
