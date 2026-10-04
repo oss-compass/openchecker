@@ -9,6 +9,24 @@ from platform_adapter import platform_manager
 COMMAND = 'dangerous-workflow-checker'
 
 
+def normalize_context_access(expression: str, platform_type: str) -> str:
+    """Normalize literal property indexes, excluding quoted expression strings."""
+    identifier = r"[A-Za-z_][A-Za-z0-9_-]*"
+    property_access = rf"(?:\s*\.\s*{identifier}|\s*\[\s*'{identifier}'\s*\])"
+    tokens = re.compile(
+        rf"'(?:[^']|'')*'|(?P<context>\b{re.escape(platform_type)}{property_access}+)"
+    )
+
+    def normalize(match):
+        context = match.group('context')
+        if context is None:
+            return "''"
+        context = re.sub(rf"\s*\[\s*'({identifier})'\s*\]", r'.\1', context)
+        return re.sub(r'\s*\.\s*', '.', context)
+
+    return tokens.sub(normalize, expression)
+
+
 def has_dangerous_trigger(workflow: Dict[str, Any]) -> bool:
     """检查是否使用危险触发器"""
     # YAML 会把 'on' 解析为 True，所以我们需要检查两种可能的键
@@ -34,7 +52,8 @@ def is_untrusted_ref(ref: str, platform_type: str) -> bool:
         f"{platform_type}.event.workflow_run"
     ]
     
-    return any(pattern in ref for pattern in untrusted_patterns)
+    normalized_ref = normalize_context_access(ref, platform_type)
+    return any(pattern in normalized_ref for pattern in untrusted_patterns)
     
     
 def find_dangerous_variables(script: str, platform_type: str) -> List[str]:
@@ -62,10 +81,11 @@ def find_dangerous_variables(script: str, platform_type: str) -> List[str]:
     
     for match in pattern.finditer(script):
         variable = match.group(1).strip()
+        normalized_variable = normalize_context_access(variable, platform_type)
         
         # 检查变量是否匹配危险模式
         for dangerous_pattern in dangerous_patterns:
-            if re.search(dangerous_pattern, variable):
+            if re.search(dangerous_pattern, normalized_variable):
                 dangerous_vars.append(variable)
                 break
     
