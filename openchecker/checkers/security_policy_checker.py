@@ -1,5 +1,4 @@
 import os
-import glob
 import re
 from typing import List, Dict, Tuple, Any
 from common import get_platform_type, list_workflow_files
@@ -13,36 +12,30 @@ def find_security_policy_files(repo_path: str, platform_type: str) -> List[str]:
     """
     查找安全策略文件
     """
-    # 支持的安全策略文件名模式（不区分大小写）
-    security_file_patterns = [
-        "security.md",
-        "security.markdown", 
-        "security.adoc",
-        "security.rst",
-        f".{platform_type}/security.md",
-        f".{platform_type}/security.markdown",
-        f".{platform_type}/security.adoc", 
-        f".{platform_type}/security.rst",
-        "docs/security.md",
-        "docs/security.markdown",
-        "docs/security.adoc",
-        "docs/security.rst",
-        "doc/security.rst"
-    ]
-    
+    file_names = {'security.md', 'security.markdown', 'security.adoc', 'security.rst'}
+    directory_names = {f'.{platform_type}'.casefold(), 'docs', 'doc'}
+    try:
+        with os.scandir(repo_path) as entries:
+            root_entries = list(entries)
+    except OSError:
+        return []
+
+    directories = [repo_path]
+    directories.extend(
+        entry.path for entry in root_entries
+        if entry.is_dir(follow_symlinks=False) and entry.name.casefold() in directory_names
+    )
     found_files = []
-    
-    for pattern in security_file_patterns:
-        full_pattern = os.path.join(repo_path, pattern)
-        
-        matches = glob.glob(full_pattern, recursive=True)
-        found_files.extend(matches)
-        
-        upper_pattern = os.path.join(repo_path, pattern.upper())
-        matches_upper = glob.glob(upper_pattern, recursive=True)
-        found_files.extend(matches_upper)
-        
-    return list(set(found_files))
+    for directory in directories:
+        try:
+            with os.scandir(directory) as entries:
+                found_files.extend(
+                    entry.path for entry in entries
+                    if entry.is_file(follow_symlinks=False) and entry.name.casefold() in file_names
+                )
+        except OSError:
+            continue
+    return found_files
 
 
 def analyze_security_policy_content(file_path: str) -> Dict:
