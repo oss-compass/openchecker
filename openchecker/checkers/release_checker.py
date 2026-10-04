@@ -210,7 +210,11 @@ def _check_zip_contents(zip_url: str, file_patterns: List[str]) -> Tuple[List[st
                 if isinstance(file_pattern, str):
                     for file_name in zip_ref.namelist():
                         base_name = os.path.basename(file_name).lower()
-                        if base_name == file_pattern.lower():
+                        stem = file_pattern.lower()
+                        if base_name == stem or any(
+                            base_name == f"{stem}.{extension}"
+                            for extension in ("md", "markdown", "txt", "rst", "adoc")
+                        ):
                             found_files.append(file_name)
                 else:
                     for file_name in zip_ref.namelist():
@@ -279,4 +283,4 @@ def release_checker(project_url: str, res_payload: dict) -> None:
         res_payload["scan_results"]["release-checker"]["signed-release-checker"] = signed_release_result
     else:
         logger.error(f"signed-release-checker job failed: {project_url}, error: {error}")
-        res_payload["scan_results"]["release-checker"]["signed-release-checker"] = {"error": error} 
+        res_payload["scan_results"]["release-checker"]["signed-release-checker"] = {"error": error}
