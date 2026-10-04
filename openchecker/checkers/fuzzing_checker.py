@@ -1,6 +1,7 @@
 import os
 import glob
 import re
+import json
 from typing import List, Dict, Tuple
 from constans import shell_script_handlers
 from common import shell_exec
@@ -202,11 +203,14 @@ def fuzzing_checker(project_url: str, res_payload: dict) -> None:
     # 检测语言特定的模糊测试
     shell_script = shell_script_handlers["languages-detector"].format(project_url=project_url)
     result, error = shell_exec(shell_script)
+    languages = []
     if error is None:
-        languages = result
-    else:
-        languages = []
-    languages = [lang.lower() for lang in languages]
+        try:
+            detected = json.loads(result)
+            if isinstance(detected, (dict, list)):
+                languages = [lang.lower() for lang in detected if isinstance(lang, str)]
+        except (TypeError, ValueError, UnicodeError):
+            pass
     lang_results = check_language_fuzzing(repo_path, languages)
     all_results.extend(lang_results)
     
