@@ -33,7 +33,8 @@ class Signer:
     
     @staticmethod
     def get_access_id(authorization):
-        return Signer.get_authorization_field(authorization, "access_id=")
+        return (Signer.get_authorization_field(authorization, "accessId=")
+                or Signer.get_authorization_field(authorization, "access_id="))
     
     @staticmethod
     def build_timestamp(request):
@@ -152,11 +153,11 @@ class Signer:
     def get_authorization_field(authorization, field_name):
         if not authorization or not authorization.strip():
             raise Warning("The authorization is error")
-        pos = authorization.find(field_name)
-        if pos == -1:
-            return ""
-        result = authorization[pos + len(field_name):]
-        pos = result.find(",")
-        if pos == -1:
-            return ""
-        return result[:pos]
+        fields = authorization.strip()
+        if fields.startswith("SDK-HMAC-SHA256 "):
+            fields = fields[len("SDK-HMAC-SHA256 "):]
+        for field in fields.split(","):
+            name, separator, value = field.strip().partition("=")
+            if separator and name + "=" == field_name:
+                return value
+        return ""
