@@ -22,7 +22,7 @@ def createTokenForUser(userID):
     if not userMatch:
         return None
 
-    user = userMatch[0]
+    user = userMatch
     expires_in = datetime.datetime.utcnow() + datetime.timedelta(minutes=expires_minutes)
     payload = {
         'user_id': user.id,
@@ -132,7 +132,7 @@ def get_token_expiration(token):
         token: JWT token字符串
         
     Returns:
-        datetime: 过期时间，如果token无效则返回None
+        datetime: 本地时区的无时区标记过期时间，如果token无效则返回None
     """
     payload = decode_jwt(token)
     if payload is None:
@@ -157,4 +157,5 @@ def is_token_expired(token):
     if exp_time is None:
         return True
     
-    return datetime.datetime.utcnow() > exp_time
+    # get_token_expiration uses fromtimestamp(), which returns local time.
+    return datetime.datetime.now() >= exp_time
