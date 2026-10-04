@@ -139,6 +139,10 @@ def _check_dependency_files(repo_path: str) -> List[Dict[str, Any]]:
                 
                 file_path = os.path.join(root, file)
                 relative_path = os.path.relpath(file_path, repo_path)
+                if tool_name == "Dependabot" and relative_path.replace(os.sep, "/") not in (
+                    ".github/dependabot.yml", ".github/dependabot.yaml"
+                ):
+                    continue
                 
                 if tool_name not in tools_dict:
                     tools_dict[tool_name] = {
