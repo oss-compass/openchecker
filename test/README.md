@@ -131,6 +131,16 @@ pytest -x
 pytest --lf
 ```
 
+### Dockerfile 依赖扫描回归
+
+在仓库根目录运行：
+
+```bash
+PYTHONPATH=openchecker python -m unittest discover -s test -p test_dockerfile_from_dependencies.py -v
+```
+
+测试使用临时 Dockerfile，覆盖 `FROM --platform=...`、已命名构建阶段的复用、不同文件间的阶段隔离，以及未指定版本的发行版镜像。无需运行 Docker 构建或连接外部服务；不覆盖构建参数展开和多行指令解析。
+
 ## 测试覆盖率
 
 ### 查看覆盖率

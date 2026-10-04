@@ -301,17 +301,26 @@ def _collect_docker_dependencies(repo_path: Path) -> List[Dict[str, Any]]:
         try:
             with open(docker_file, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
+
+            stage_names = set()
             
             for line_num, line in enumerate(lines, 1):
                 line = line.strip()
                 
                 # 匹配 FROM 指令
-                from_match = re.search(r'^FROM\s+([^\s]+)', line, re.IGNORECASE)
+                from_match = re.fullmatch(
+                    r'FROM\s+(?:--platform=\S+\s+)?(\S+)(?:\s+AS\s+(\S+))?',
+                    line, re.IGNORECASE
+                )
                 if from_match:
                     image_ref = from_match.group(1)
-                    
-                    # 跳过多阶段构建中的别名
-                    if image_ref.lower() in ['scratch', 'alpine', 'ubuntu', 'debian']:
+                    is_internal = image_ref.lower() in stage_names
+                    stage_name = from_match.group(2)
+                    if stage_name:
+                        stage_names.add(stage_name.lower())
+
+                    # scratch 和此前定义的构建阶段不引用外部镜像。
+                    if image_ref.lower() == 'scratch' or is_internal:
                         continue
                         
                     # 解析镜像引用
