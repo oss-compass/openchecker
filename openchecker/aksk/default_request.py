@@ -1,4 +1,4 @@
-from urllib.parse import quote, unquote
+from urllib.parse import parse_qsl, quote
 
 class DefaultRequest:
     def __init__(self, access_id: str, secret_key: str):
@@ -45,13 +45,9 @@ class DefaultRequest:
     def set_url(self, url: str):
         if not url or not url.strip():
             raise Warning("url cannot be empty")
-        self.path = url
-        if '?' in url:
-            query_list = url.split('?', 1)
-            for param in query_list:
-                if '=' in param.split('&'):
-                    key, value = param.split('=', 1)
-                    self.query_params[quote(unquote(key))] = quote(unquote(value))
+        self.path, _, query = url.partition('?')
+        for key, value in parse_qsl(query, keep_blank_values=True):
+            self.query_params[quote(key)] = quote(value)
 
     def add_query_param(self, key: str, value: str):
         if not key or not key.strip():
