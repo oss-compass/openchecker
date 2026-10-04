@@ -91,13 +91,14 @@ def setup_logging(
         log_dir: Log directory
     """
     
-    # Ensure log directory exists
-    if log_dir and not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-    
     # Set default log file path
     if log_file is None and enable_file:
         log_file = os.path.join(log_dir, "openchecker.log")
+
+    # Explicit log_file paths may have a different parent than log_dir.
+    if enable_file and log_file:
+        parent_dir = os.path.dirname(os.path.abspath(log_file))
+        os.makedirs(parent_dir, exist_ok=True)
     
     # Set log level based on environment
     env_level = os.getenv('LOG_LEVEL', log_level)
@@ -139,7 +140,8 @@ def setup_logging(
         }
         
         # Separate error log file
-        error_log_file = log_file.replace('.log', '_error.log')
+        log_stem, log_extension = os.path.splitext(log_file)
+        error_log_file = log_stem + '_error' + (log_extension or '.log')
         handlers['error_file'] = {
             'class': 'logging.handlers.RotatingFileHandler',
             'level': 'ERROR',
