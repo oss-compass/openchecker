@@ -55,7 +55,7 @@ def _build_sonar_url(sonar_config: dict, path: str) -> str:
     if not path.startswith('/'):
         path = f"/{path}"
     
-    return f"{base_url}{path}"
+    return f"{base_url.rstrip('/')}{path}"
 
 
 def sonar_checker(project_url: str, res_payload: dict, config: dict) -> None:
@@ -385,4 +385,4 @@ def _query_sonar_measures(project_name: str, sonar_config: dict) -> dict:
         return {"error": f"Query failed: {str(e)}"}
     except Exception as e:
         logger.error(f"Exception querying SonarQube measures: {e}")
-        return {"error": f"Query exception: {str(e)}"} 
+        return {"error": f"Query exception: {str(e)}"}
