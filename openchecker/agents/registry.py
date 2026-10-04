@@ -78,6 +78,8 @@ class AgentRegistry:
         with self.lock:
             if agent_id in self.agents:
                 self.agents[agent_id]['last_update'] = datetime.datetime.now()
+                if self.agents[agent_id]['status'] == 'inactive':
+                    self.agents[agent_id]['status'] = 'active'
                 print(f"Received heartbeat from Agent {agent_id}.")
             else:
                 print(f"Agent {agent_id} not found.")
