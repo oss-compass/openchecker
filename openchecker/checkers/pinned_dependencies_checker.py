@@ -311,7 +311,7 @@ def _collect_docker_dependencies(repo_path: Path) -> List[Dict[str, Any]]:
                     image_ref = from_match.group(1)
                     
                     # 跳过多阶段构建中的别名
-                    if image_ref.lower() in ['scratch', 'alpine', 'ubuntu', 'debian']:
+                    if image_ref.lower() == 'scratch':
                         continue
                         
                     # 解析镜像引用
