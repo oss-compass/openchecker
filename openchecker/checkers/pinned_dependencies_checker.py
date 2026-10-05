@@ -306,7 +306,7 @@ def _collect_docker_dependencies(repo_path: Path) -> List[Dict[str, Any]]:
                 line = line.strip()
                 
                 # 匹配 FROM 指令
-                from_match = re.search(r'^FROM\s+([^\s]+)', line, re.IGNORECASE)
+                from_match = re.search(r'^FROM\s+(?:--platform=\S+\s+)?([^\s]+)', line, re.IGNORECASE)
                 if from_match:
                     image_ref = from_match.group(1)
                     
