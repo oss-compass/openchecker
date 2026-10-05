@@ -71,6 +71,9 @@ def run_scorecard_cli(project_url: str) -> Tuple[Dict, str]:
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse scorecard JSON: {e}")
                 return None, "Failed to parse scorecard JSON."
+            except (KeyError, TypeError) as e:
+                logger.error(f"Invalid scorecard JSON structure: {e}")
+                return None, "Invalid scorecard JSON structure."
             return scorecard_json, None
         else:
             logger.error(f"Scorecard command failed: {result.stderr}")
