@@ -67,11 +67,10 @@ def _get_diff_files(commit_hash: str, type: str = "ACDMRTUXB") -> List[str]:
     """
     try:
         result = subprocess.check_output(
-            ["git", "diff", "--name-only", f"--diff-filter={type}", f"{commit_hash}..HEAD"],
-            stderr=subprocess.STDOUT,
-            text=True
+            ["git", "diff", "--name-only", "-z", f"--diff-filter={type}", f"{commit_hash}..HEAD"],
+            stderr=subprocess.STDOUT
         )
-        return result.strip().split("\n") if result else []
+        return result.decode("utf-8").split("\0")[:-1] if result else []
     except subprocess.CalledProcessError as e:
         logger.error(f"failed to get {type} files: {e.output}")
-        return [] 
+        return []
