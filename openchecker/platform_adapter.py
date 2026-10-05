@@ -112,7 +112,7 @@ class GitHubAdapter(PlatformAdapter):
         # https://github.com/owner/repo.git
         # https://github.com/owner/repo
         # https://www.github.com/owner/repo
-        pattern = r"https://(?:www\.)?github\.com/([^/]+)/([^/]+?)(?:\.git)?$"
+        pattern = r"https://(?:www\.)?github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$"
         match = re.match(pattern, project_url)
         if match:
             owner_name, repo_name = match.groups()
@@ -189,7 +189,7 @@ class GiteeAdapter(PlatformAdapter):
         # https://gitee.com/owner/repo.git
         # https://gitee.com/owner/repo
         # https://www.gitee.com/owner/repo
-        pattern = r"https://(?:www\.)?gitee\.com/([^/]+)/([^/]+?)(?:\.git)?$"
+        pattern = r"https://(?:www\.)?gitee\.com/([^/]+)/([^/]+?)(?:\.git)?/?$"
         match = re.match(pattern, project_url)
         if match:
             owner_name, repo_name = match.groups()
@@ -265,7 +265,7 @@ class GitCodeAdapter(PlatformAdapter):
         # https://gitcode.com/owner/repo.git
         # https://gitcode.com/owner/repo
         # https://www.gitcode.com/owner/repo
-        pattern = r"https://(?:www\.)?gitcode\.com/([^/]+)/([^/]+?)(?:\.git)?$"
+        pattern = r"https://(?:www\.)?gitcode\.com/([^/]+)/([^/]+?)(?:\.git)?/?$"
         match = re.match(pattern, project_url)
         if match:
             owner_name, repo_name = match.groups()
@@ -463,4 +463,4 @@ class PlatformManager:
 
 
 # 全局平台管理器实例
-platform_manager = PlatformManager(config) 
+platform_manager = PlatformManager(config)
