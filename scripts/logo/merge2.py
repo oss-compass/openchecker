@@ -33,19 +33,21 @@ for project_name in projects:
     if project_name in finished_job:
         continue
     
+    prompt_name = project_name
+
     if project_name == 'ohos_ftp_srv':
-        project_name = "ftp server"
+        prompt_name = "ftp server"
     
     if project_name == 'vulkan-validationlayers':
-        project_name = "vulkan"
+        prompt_name = "vulkan"
         
     if project_name == 'tencent-mmkv':
-        project_name = "mmkv"
+        prompt_name = "mmkv"
     
     if project_name == 'tencent-libpag':
-        project_name = "libpag"
+        prompt_name = "libpag"
         
-    inputs = f"name logo for software {project_name}"
+    inputs = f"name logo for software {prompt_name}"
     image_bytes = query({
         "inputs": inputs,
     })
