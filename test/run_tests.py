@@ -14,6 +14,7 @@ import sys
 import subprocess
 import argparse
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -144,7 +145,7 @@ def generate_test_report():
     try:
         with open("test-summary.json", "w") as f:
             summary = {
-                "timestamp": "2024-01-01T00:00:00Z",
+                "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "test_run": "completed",
                 "reports": {
                     "coverage_html": "htmlcov/all/index.html",
