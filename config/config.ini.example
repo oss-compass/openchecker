@@ -1,0 +1,59 @@
+# Copy this file to config/config.ini as shown in the quick-start guide.
+# Edit the service addresses, credentials and JWT secret before starting.
+
+[RabbitMQ]
+host = localhost
+port = 5672
+username =
+password =
+# Heartbeat interval in seconds
+heartbeat_interval_s = 60
+# Blocked connection timeout in milliseconds
+blocked_connection_timeout_ms = 300000
+
+[SonarQube]
+host = https://sonarqube.mlops.pub
+port = None
+username =
+password =
+token =
+# Scan timeout in seconds
+scan_timeout_s = 1800
+# Maximum wait time for background task completion in seconds
+report_max_wait_time_s = 120
+# Check interval for background task status in seconds
+report_check_interval_s = 10
+
+[OpenCheck]
+host = 0.0.0.0
+port = 80
+ssl_crt_path = /path/to/certificate.crt
+ssl_key_path = /path/to/private.key
+repos_dir = /tmp/repos
+
+[ChatBot]
+base_url =
+api_key =
+model_name =
+
+[Gitee]
+access_key =
+
+[Github]
+access_key =
+
+[GitCode]
+access_key =
+
+[UserManager]
+default_username =
+default_password =
+
+[JWT]
+secret_key =
+# Token expiration time in minutes
+expires_minutes = 300
+
+[AKSK]
+access_key =
+secret_key =
