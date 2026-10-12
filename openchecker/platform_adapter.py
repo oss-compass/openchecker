@@ -204,13 +204,19 @@ class GiteeAdapter(PlatformAdapter):
             url = f"https://gitee.com/api/v5/repos/{owner_name}/{repo_name}/releases"
             
             headers = {'Accept': 'application/json'}
-            response = requests.get(url, headers=headers)
-            
-            if response.status_code == 200:
+            all_releases = []
+            page = 1
+            per_page = 100
+            while True:
+                response = requests.get(
+                    url, headers=headers, params={'page': page, 'per_page': per_page})
+                if response.status_code != 200:
+                    return [], "Not found"
                 releases = response.json()
-                return releases, None
-            else:
-                return [], "Not found"
+                all_releases.extend(releases)
+                if len(releases) < per_page:
+                    return all_releases, None
+                page += 1
         except Exception as e:
             logger.error(f"Failed to get Gitee releases for repo: {project_url}, Error: {e}")
             return [], f"Failed to get releases for repo: {project_url}"
@@ -463,4 +469,4 @@ class PlatformManager:
 
 
 # 全局平台管理器实例
-platform_manager = PlatformManager(config) 
+platform_manager = PlatformManager(config)
