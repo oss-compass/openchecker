@@ -49,32 +49,30 @@ def create_queue(config, queue_name, arguments={}):
     parameters = pika.ConnectionParameters(config['host'], int(config['port']), '/', credentials)
 
     try:
-        connection = pika.BlockingConnection(parameters)
-        channel = connection.channel()
-
-        queue = channel.queue_declare(queue=queue_name, arguments=arguments, passive=True)
-        logger.info(f"Queue {queue_name} already exists, skipping creation")
-
-    except pika.exceptions.ChannelClosed as e:
-        logger.info(f"Queue {queue_name} does not exist, creating now")
-        connection = pika.BlockingConnection(parameters)
-        channel = connection.channel()
-        queue = channel.queue_declare(queue=queue_name, arguments=arguments)
+        with pika.BlockingConnection(parameters) as connection:
+            channel = connection.channel()
+            try:
+                channel.queue_declare(queue=queue_name, arguments=arguments, passive=True)
+                logger.info(f"Queue {queue_name} already exists, skipping creation")
+            except pika.exceptions.ChannelClosedByBroker as e:
+                if e.reply_code != 404:
+                    raise
+                logger.info(f"Queue {queue_name} does not exist, creating now")
+                # A failed passive declaration closes the channel, not the connection.
+                channel = connection.channel()
+                channel.queue_declare(queue=queue_name, arguments=arguments)
     except Exception as e:
         logger.error(f"Failed to connect to RabbitMQ: {str(e)}")
         exit()
-
-    connection.close()
 
 def publish_message(config, queue_name, message_body):
     credentials = pika.PlainCredentials(config['username'], config['password'])
     parameters = pika.ConnectionParameters(config['host'], int(config['port']), '/', credentials)
 
     try:
-        connection = pika.BlockingConnection(parameters)
-        channel = connection.channel()
-        channel.basic_publish(exchange='', routing_key=queue_name, body=message_body)
-        connection.close()
+        with pika.BlockingConnection(parameters) as connection:
+            channel = connection.channel()
+            channel.basic_publish(exchange='', routing_key=queue_name, body=message_body)
         logger.info(f"Message published successfully")
         return None
     except Exception as e:
@@ -193,14 +191,11 @@ def check_queue_status(config, queue_name):
     parameters = pika.ConnectionParameters(config['host'], int(config['port']), '/', credentials)
 
     try:
-        connection = pika.BlockingConnection(parameters)
-        channel = connection.channel()
-
-        queue_declaration = channel.queue_declare(queue=queue_name, passive=True)
-        messages_in_queue = queue_declaration.method.message_count
-        consumers_on_queue = queue_declaration.method.consumer_count
-
-        connection.close()
+        with pika.BlockingConnection(parameters) as connection:
+            channel = connection.channel()
+            queue_declaration = channel.queue_declare(queue=queue_name, passive=True)
+            messages_in_queue = queue_declaration.method.message_count
+            consumers_on_queue = queue_declaration.method.consumer_count
         return messages_in_queue, consumers_on_queue
     except Exception as e:
         logger.info(f"Error checking queue status: {str(e)}")
@@ -211,13 +206,10 @@ def get_queue_info(config, queue_name):
     parameters = pika.ConnectionParameters(config['host'], int(config['port']), '/', credentials)
 
     try:
-        connection = pika.BlockingConnection(parameters)
-        channel = connection.channel()
-
-        queue_declaration = channel.queue_declare(queue=queue_name, passive=True)
-        queue_arguments = queue_declaration.method.arguments
-
-        connection.close()
+        with pika.BlockingConnection(parameters) as connection:
+            channel = connection.channel()
+            queue_declaration = channel.queue_declare(queue=queue_name, passive=True)
+            queue_arguments = queue_declaration.method.arguments
         return queue_arguments
     except Exception as e:
         logger.info(f"Error getting queue info: {str(e)}")
@@ -238,10 +230,9 @@ def delete_queue(config, queue_name):
     parameters = pika.ConnectionParameters(config['host'], int(config['port']), '/', credentials)
 
     try:
-        connection = pika.BlockingConnection(parameters)
-        channel = connection.channel()
-        channel.queue_delete(queue=queue_name)
-        connection.close()
+        with pika.BlockingConnection(parameters) as connection:
+            channel = connection.channel()
+            channel.queue_delete(queue=queue_name)
         logger.info(f"Queue {queue_name} deleted successfully.")
     except Exception as e:
         logger.info(f"Error deleting queue {queue_name}: {str(e)}")
@@ -251,10 +242,9 @@ def purge_queue(config, queue_name):
     parameters = pika.ConnectionParameters(config['host'], int(config['port']), '/', credentials)
 
     try:
-        connection = pika.BlockingConnection(parameters)
-        channel = connection.channel()
-        channel.queue_purge(queue=queue_name)
-        connection.close()
+        with pika.BlockingConnection(parameters) as connection:
+            channel = connection.channel()
+            channel.queue_purge(queue=queue_name)
         logger.info(f"Queue {queue_name} purged successfully.")
     except Exception as e:
         logger.info(f"Error purging queue {queue_name}: {str(e)}")
