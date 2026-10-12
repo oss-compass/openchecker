@@ -10,7 +10,7 @@ import json
 from logger import get_logger
 import requests
 from typing import Dict, List, Tuple, Optional, Any
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 from ghapi.all import GhApi, paged
 from helper import read_config
 import os
@@ -138,7 +138,7 @@ class GitHubAdapter(PlatformAdapter):
         """获取GitHub zipball URL"""
         try:
             owner_name, repo_name = self.parse_project_url(project_url)
-            return f"https://github.com/{owner_name}/{repo_name}/archive/refs/tags/{tag}.zip"
+            return f"https://github.com/{owner_name}/{repo_name}/archive/refs/tags/{quote(tag)}.zip"
         except ValueError:
             return None
             
@@ -219,7 +219,7 @@ class GiteeAdapter(PlatformAdapter):
         """获取Gitee zipball URL"""
         try:
             owner_name, repo_name = self.parse_project_url(project_url)
-            return f"https://gitee.com/{owner_name}/{repo_name}/repository/archive/{tag}.zip"
+            return f"https://gitee.com/{owner_name}/{repo_name}/repository/archive/{quote(tag)}.zip"
         except ValueError:
             return None
             
@@ -295,7 +295,7 @@ class GitCodeAdapter(PlatformAdapter):
         """获取GitCode zipball URL"""
         try:
             owner_name, repo_name = self.parse_project_url(project_url)
-            return f"https://raw.gitcode.com/{owner_name}/{repo_name}/archive/refs/heads/{tag}.zip"
+            return f"https://raw.gitcode.com/{owner_name}/{repo_name}/archive/refs/heads/{quote(tag)}.zip"
         except ValueError:
             return None
             
@@ -463,4 +463,4 @@ class PlatformManager:
 
 
 # 全局平台管理器实例
-platform_manager = PlatformManager(config) 
+platform_manager = PlatformManager(config)
