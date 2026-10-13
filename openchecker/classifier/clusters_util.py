@@ -33,9 +33,9 @@ class KMeans:
         self.clusters_with_index = None
 
     def fit(self, X, Y=None):
-        intial_centroids_index = np.random.choice(X.shape[0], self.n_clusters, replace=False)
-        self.centroids_x = X[intial_centroids_index]
-        self.centroids_y = Y[intial_centroids_index]
+        initial_centroids_index = np.random.choice(X.shape[0], self.n_clusters, replace=False)
+        self.centroids_x = X[initial_centroids_index]
+        self.centroids_y = Y[initial_centroids_index]
 
         for _ in range(self.max_iter):
             clusters_x = [[] for _ in range(self.n_clusters)]

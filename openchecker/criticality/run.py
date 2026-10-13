@@ -439,7 +439,7 @@ class GitLabRepository(Repository):
 
 
 def get_param_score(param, max_value, weight=1):
-    """Return paramater score given its current value, max value and
+    """Return parameter score given its current value, max value and
     parameter weight."""
     return (math.log(1 + param) / math.log(1 + max(param, max_value))) * weight
 

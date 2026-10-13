@@ -33,7 +33,7 @@ def get_client(url):
     return client
 
 def too_many_scrolls(res):
-    """Check if result conatins 'too many scroll contexts' error"""
+    """Check if result contains 'too many scroll contexts' error"""
     r = res
     return (
         r
