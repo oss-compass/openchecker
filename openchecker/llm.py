@@ -10,7 +10,7 @@ def retry_with_exponential_backoff(
     exponential_base: float = 2,
     jitter: bool = False,
     max_retries: int = 10,
-    errors: tuple = (openai.RateLimitError, openai.APIError, openai.Timeout, openai.APIConnectionError, openai.InternalServerError),
+    errors: tuple = (openai.APIConnectionError, openai.APIStatusError),
 ):
     """Retry a function with exponential backoff."""
  
@@ -25,15 +25,19 @@ def retry_with_exponential_backoff(
                 return func(*args, **kwargs)
  
             # Retry on specific errors
-            except Exception as e:
+            except errors as e:
+                # Match the SDK's transient HTTP statuses; other API errors
+                # require a changed request or credentials, not another retry.
+                if isinstance(e, openai.APIStatusError):
+                    if e.status_code not in (408, 409, 429) and e.status_code < 500:
+                        raise
+
                 # Increment retries
                 num_retries += 1
  
                 # Check if max retries has been reached
                 if num_retries > max_retries:
-                    raise Exception(
-                        f"Maximum number of retries ({max_retries}) exceeded."
-                    )
+                    raise
  
                 # Increment the delay
                 delay *= exponential_base
