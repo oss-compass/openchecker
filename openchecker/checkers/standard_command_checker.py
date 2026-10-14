@@ -191,7 +191,11 @@ def get_package_info(project_url: str) -> Tuple[Dict, str]:
             if repo_error:
                 logger.error(f"Failed to get repo info for {project_url}: {repo_error}")
                 return {"description": False, "home_url": False, "dependent_count": False, "down_count": False, "day_enter": False}, repo_error
-                
+
+            if download_error:
+                logger.error(f"Failed to get download stats for {project_url}: {download_error}")
+                return {"description": False, "home_url": False, "dependent_count": False, "down_count": False, "day_enter": False}, download_error
+
             description = repo_info.get("description", "")
             home_url = repo_info.get("homepage", "")
             down_count = download_stats.get("download_count", 0)
