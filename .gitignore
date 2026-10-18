@@ -1,3 +1,7 @@
 *.log
 /logs/
 **/__pycache__
+# coverage artifacts produced by the pytest-cov options in test/pytest.ini
+.coverage
+coverage.xml
+htmlcov/

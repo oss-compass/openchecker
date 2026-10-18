@@ -1,7 +1,7 @@
 import datetime
 import unittest
 import jwt
-from token_operator import createTokenForUser, validate_jwt, decode_jwt, refresh_token, get_token_expiration, is_token_expired, createTokenWithPayload
+from openchecker.token_operator import createTokenForUser, validate_jwt, decode_jwt, refresh_token, get_token_expiration, is_token_expired, createTokenWithPayload
 
 class TestJWTFunctions(unittest.TestCase):
 

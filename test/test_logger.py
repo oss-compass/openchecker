@@ -37,9 +37,22 @@ class TestLoggerSetup(unittest.TestCase):
         """测试前置设置"""
         self.temp_dir = tempfile.mkdtemp()
         self.log_file = os.path.join(self.temp_dir, "test.log")
+        # setup_logging() lets the LOG_LEVEL environment variable override its
+        # log_level argument, and conftest's session fixture exports
+        # LOG_LEVEL=DEBUG. Tests that assert the *default* configuration must
+        # not inherit that value, so take it out of the environment and restore
+        # it afterwards.
+        self._saved_log_level = os.environ.pop('LOG_LEVEL', None)
 
     def tearDown(self):
         """测试后清理"""
+        if self._saved_log_level is not None:
+            os.environ['LOG_LEVEL'] = self._saved_log_level
+        # The handlers installed by setup_logging() keep the log file open, and
+        # Windows refuses to delete a file that is still open (WinError 32).
+        # Close them before removing the directory so the suite also passes on
+        # Windows; on POSIX this is a no-op.
+        logging.shutdown()
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
         
@@ -131,6 +144,11 @@ class TestLoggerUsage(unittest.TestCase):
 
     def tearDown(self):
         """测试后清理"""
+        # The handlers installed by setup_logging() keep the log file open, and
+        # Windows refuses to delete a file that is still open (WinError 32).
+        # Close them before removing the directory so the suite also passes on
+        # Windows; on POSIX this is a no-op.
+        logging.shutdown()
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
         
@@ -376,6 +394,9 @@ class TestLoggerIntegration(unittest.TestCase):
 
     def tearDown(self):
         """集成测试后清理"""
+        # See TestLoggerSetup.tearDown: release the open log files first so the
+        # directory can be removed on Windows as well.
+        logging.shutdown()
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
         

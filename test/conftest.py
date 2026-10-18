@@ -18,7 +18,23 @@ from unittest.mock import Mock, patch
 import logging
 
 import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+# The application is started as `python openchecker/main.py` (see the Dockerfile
+# CMD), which puts the `openchecker/` directory itself on sys.path. Every module
+# inside the package relies on that layout and imports its siblings by flat name
+# (`from helper import read_config`, `from common import shell_exec`,
+# `from user_manager import authenticate`, `from logger import get_logger`, ...).
+#
+# The tests import the package instead (`from openchecker.message_queue import a,
+# b`), so only the repository root ends up on sys.path and those flat imports
+# raise `ModuleNotFoundError: No module named 'helper'` (idem `common`, `logger`,
+# `user_manager`, `token_operator`). Put both directories on sys.path so the
+# import path matches the way the service actually runs at runtime.
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PACKAGE_DIR = os.path.join(PROJECT_ROOT, 'openchecker')
+for _import_path in (PACKAGE_DIR, PROJECT_ROOT):
+    if _import_path not in sys.path:
+        sys.path.insert(0, _import_path)
 
 # Mock the imports that might not be available during testing
 try:

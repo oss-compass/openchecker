@@ -25,8 +25,7 @@ from openchecker.message_queue import (
     create_queue,
     publish_message,
     consumer,
-    check_queue_status,
-    heartbeat_sender
+    check_queue_status
 )
 
 
@@ -181,6 +180,13 @@ class TestMessageQueue(unittest.TestCase):
         # 验证结果
         self.assertIsNone(result)
 
+    @unittest.skip(
+        "Stale test: heartbeat_sender() never existed as a module-level symbol - "
+        "it was a local closure inside consumer() and was removed in 0a0b7a3 "
+        "('moving heartbeat acknowledgment to main thread'), where the heartbeat is "
+        "now kept by connection.process_data_events() in the consumer loop. "
+        "Kept (not deleted) until it is rewritten against the current API."
+    )
     def test_heartbeat_sender(self):
         """测试心跳发送器"""
         # 创建模拟连接

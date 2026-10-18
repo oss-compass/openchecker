@@ -18,12 +18,11 @@ def createTokenForUser(userID):
     Returns:
         str: JWT token字符串，如果用户不存在则返回None
     """
-    userMatch = indexUserWithID(userID)
-    if not userMatch:
+    user = indexUserWithID(userID)
+    if not user:
         return None
 
-    user = userMatch[0]
-    expires_in = datetime.datetime.utcnow() + datetime.timedelta(minutes=expires_minutes)
+    expires_in = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=expires_minutes)
     payload = {
         'user_id': user.id,
         'user_name': user.name,
@@ -47,7 +46,7 @@ def createTokenWithPayload(payload, expires_minutes=None):
     if expires_minutes is None:
         expires_minutes = int(jwt_config.get("expires_minutes", 30))
     
-    expires_in = datetime.datetime.utcnow() + datetime.timedelta(minutes=expires_minutes)
+    expires_in = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=expires_minutes)
     payload['exp'] = expires_in
     jwt_token = jwt.encode(payload, secret_key, algorithm='HS256')
     return jwt_token
@@ -140,7 +139,10 @@ def get_token_expiration(token):
     
     exp_timestamp = payload.get('exp')
     if exp_timestamp:
-        return datetime.datetime.fromtimestamp(exp_timestamp)
+        # The JWT `exp` claim is a POSIX timestamp, i.e. UTC. Decode it as UTC
+        # so the result can be compared with a UTC "now"; fromtimestamp() alone
+        # returns local time and shifted every comparison by the host offset.
+        return datetime.datetime.fromtimestamp(exp_timestamp, datetime.timezone.utc)
     return None
 
 def is_token_expired(token):
@@ -157,4 +159,4 @@ def is_token_expired(token):
     if exp_time is None:
         return True
     
-    return datetime.datetime.utcnow() > exp_time
+    return datetime.datetime.now(datetime.timezone.utc) > exp_time

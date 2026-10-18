@@ -1,6 +1,6 @@
 import unittest
 import datetime
-from register import AgentRegistry
+from openchecker.agents.registry import AgentRegistry
 
 class TestAgentRegistry(unittest.TestCase):
 

@@ -18,7 +18,14 @@ usernameTable = {u.name: u for u in userList}
 useridTable = {u.id: u for u in userList}
 
 def createUser(username, password, access):
-    userList.append(User(str(uuid.uuid5(uuid.NAMESPACE_DNS, username)), username, password, access))
+    user = User(str(uuid.uuid5(uuid.NAMESPACE_DNS, username)), username, password, access)
+    userList.append(user)
+    # Keep both lookup tables in sync with userList, otherwise a user created
+    # here can never be found by indexUserWithID()/indexUserWithName(), which
+    # means authenticate() and identity() reject it forever.
+    usernameTable[user.name] = user
+    useridTable[user.id] = user
+    return user
 
 def indexUserWithID(userID):
     return useridTable.get(userID, None)
@@ -43,9 +50,14 @@ def update_user(userID, new_username=None, new_password=None, new_access=None):
     user = indexUserWithID(userID)
     if user:
         if new_username:
+            old_username = user.name
             user.name = new_username
             usernameTable[new_username] = user
-            del usernameTable[user.name]
+            # Drop the entry under the *old* name. Reading user.name again here
+            # re-reads the name that was just assigned, so the rename used to
+            # delete the fresh entry and leave the stale key behind.
+            if old_username != new_username:
+                usernameTable.pop(old_username, None)
         if new_password:
             user.password = new_password
         if new_access:

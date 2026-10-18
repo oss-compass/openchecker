@@ -1,6 +1,7 @@
 import logging
 import logging.config
 import json
+import sys
 import time
 import functools
 import os
@@ -26,11 +27,32 @@ class StructuredFormatter(logging.Formatter):
         
         # If there's exception info, add it to structured data
         if record.exc_info:
-            record.structured_data['exception'] = {
-                'type': record.exc_info[0].__name__,
-                'message': str(record.exc_info[1]),
-                'traceback': traceback.format_exception(*record.exc_info)
-            }
+            exc_info = record.exc_info
+            if isinstance(exc_info, BaseException):
+                exc_info = (type(exc_info), exc_info, exc_info.__traceback__)
+            elif not isinstance(exc_info, tuple) or len(exc_info) != 3:
+                # A record can carry `exc_info=True` (it is what logging itself
+                # accepts, and what hand-built / replayed records contain). It
+                # used to reach `record.exc_info[0]` below and turn the logging
+                # call into a TypeError, i.e. logging an error could crash the
+                # error path. Resolve it against the live exception instead.
+                exc_info = sys.exc_info()
+            if exc_info and exc_info[0] is not None:
+                record.structured_data['exception'] = {
+                    'type': exc_info[0].__name__,
+                    'message': str(exc_info[1]),
+                    'traceback': traceback.format_exception(*exc_info)
+                }
+            else:
+                # `exc_info=True` is resolved by Logger._log() against the
+                # exception being handled at *logging* time. A record built by
+                # hand, or replayed from a queue, keeps the bare flag, so once
+                # it is formatted later there is no traceback left to attach.
+                # Report that instead of dropping the field without a trace.
+                record.structured_data['exception'] = {
+                    'type': 'unavailable',
+                    'message': 'exc_info was set but no traceback is attached to the record'
+                }
         
         # Add the actual message content
         record.structured_data['message'] = record.getMessage()
@@ -40,6 +62,22 @@ class StructuredFormatter(logging.Formatter):
             record.structured_data.update(record.extra_fields)
         
         return json.dumps(record.structured_data, ensure_ascii=False, default=str)
+
+class SimpleFormatter(logging.Formatter):
+    """Human-readable log formatter used when `log_format="simple"`.
+
+    setup_logging() documents two formats, "structured" and "simple", but only
+    the structured branch had a formatter class of its own; the simple branch
+    built plain ``logging.Formatter`` instances from a format string, so the
+    two modes were not symmetric and callers had no formatter object to reuse
+    or to configure a handler with directly.
+    """
+
+    DEFAULT_FORMAT = '%(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(message)s'
+    DEFAULT_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
+
+    def __init__(self, fmt: Optional[str] = None, datefmt: Optional[str] = None):
+        super().__init__(fmt or self.DEFAULT_FORMAT, datefmt or self.DEFAULT_DATE_FORMAT)
 
 def get_logger(name: str = None) -> logging.Logger:
     """Get configured logger instance"""
@@ -111,10 +149,11 @@ def setup_logging(
         }
     else:
         formatters['simple'] = {
-            'format': '%(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(message)s'
+            '()': SimpleFormatter
         }
         formatters['detailed'] = {
-            'format': '%(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(funcName)s: %(message)s'
+            '()': SimpleFormatter,
+            'fmt': '%(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(funcName)s: %(message)s'
         }
     
     # Handler configuration
@@ -213,7 +252,36 @@ def setup_logging(
         }
     }
     
-    logging.config.dictConfig(config)
+    try:
+        logging.config.dictConfig(config)
+    except Exception as exc:
+        # dictConfig() raises when a handler cannot be built - an unwritable
+        # log directory, a read-only or full filesystem, a locked file on
+        # Windows. Losing the log file must not take the service down at
+        # startup, so fall back to console output and say why.
+        fallback = {
+            'version': 1,
+            'disable_existing_loggers': False,
+            'formatters': {'simple': {'()': SimpleFormatter}},
+            'handlers': {
+                'console': {
+                    'class': 'logging.StreamHandler',
+                    'level': log_level,
+                    'formatter': 'simple',
+                    'stream': 'ext://sys.stdout'
+                }
+            },
+            'loggers': {
+                '': {'handlers': ['console'], 'level': log_level, 'propagate': False},
+                'openchecker': {'handlers': ['console'], 'level': log_level, 'propagate': False}
+            }
+        }
+        logging.config.dictConfig(fallback)
+        logging.getLogger('openchecker').warning(
+            "Logging setup failed (%s: %s); continuing with console logging only",
+            type(exc).__name__, exc)
+        return
+
     
     # Log configuration information
     logger = get_logger('openchecker')
