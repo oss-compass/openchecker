@@ -65,7 +65,7 @@ class KMeans:
     def predict(self, X, Y=None):
         predictions = []
         for point in X:
-            distances = [self.distance_func_x(point, centroid) for centroid in self.centroids]
+            distances = [self.distance_func_x(point, centroid) for centroid in self.centroids_x]
             cluster_index = np.argmin(distances)
             predictions.append(cluster_index)
         return np.array(predictions)
