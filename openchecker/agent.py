@@ -247,7 +247,7 @@ def callback_func(ch, method, properties, body):
         task_metadata = message.get('task_metadata', {})
         version_number = task_metadata.get("version_number", "None")
         
-        project_url = project_url.replace(".git", "")
+        project_url = (project_url or "").replace(".git", "")
         logger.info(
             f"Starting to process project: {project_url}",
             extra={
