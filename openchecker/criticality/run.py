@@ -400,7 +400,6 @@ class GitLabRepository(Repository):
                     release_time).days > RELEASE_LOOKBACK_DAYS:
                 break
             count += 1
-        count = 0
         if not count:
             for tag in self._repo.tags.list():
                 tag_time = self._date_from_string(tag.commit['created_at'])
