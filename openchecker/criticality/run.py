@@ -343,7 +343,7 @@ class GitLabRepository(Repository):
     @property
     def language(self):
         languages = self._repo.languages()
-        return (max(languages, key=languages.get)).lower()
+        return (max(languages, key=languages.get) if languages else '').lower()
 
     @property
     def last_commit(self):
