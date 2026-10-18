@@ -45,13 +45,19 @@ class DefaultRequest:
     def set_url(self, url: str):
         if not url or not url.strip():
             raise Warning("url cannot be empty")
-        self.path = url
-        if '?' in url:
-            query_list = url.split('?', 1)
-            for param in query_list:
-                if '=' in param.split('&'):
-                    key, value = param.split('=', 1)
-                    self.query_params[quote(unquote(key))] = quote(unquote(value))
+        if '?' not in url:
+            self.path = url
+            return
+        path, query_string = url.split('?', 1)
+        self.path = path
+        for pair in query_string.split('&'):
+            if not pair:
+                continue
+            if '=' not in pair:
+                self.query_params[quote(unquote(pair))] = ''
+                continue
+            key, value = pair.split('=', 1)
+            self.query_params[quote(unquote(key))] = quote(unquote(value))
 
     def add_query_param(self, key: str, value: str):
         if not key or not key.strip():
