@@ -313,7 +313,7 @@ def callback_func(ch, method, properties, body):
         try:
             os.chdir(original_cwd)
             logger.info(f"Restored working directory after exception: {os.getcwd()}")
-        except:
+        except OSError:
             pass
 
         _handle_error_and_nack(ch, method, body, str(e))
