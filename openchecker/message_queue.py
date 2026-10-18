@@ -225,7 +225,7 @@ def get_queue_info(config, queue_name):
 
 def view_queue_logs(log_file_path):
     try:
-        with open(log_file_path, 'r') as log_file:
+        with open(log_file_path, 'r', encoding='utf-8') as log_file:
             logs = log_file.readlines()
             queue_logs = [log for log in logs if "Queue" in log]
             return queue_logs
