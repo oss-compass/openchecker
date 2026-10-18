@@ -33,7 +33,10 @@ class Signer:
     
     @staticmethod
     def get_access_id(authorization):
-        return Signer.get_authorization_field(authorization, "access_id=")
+        # The field name written by build_authorization_header() is `accessId`;
+        # searching for `access_id=` never matched, so a header produced by
+        # Signer.sign() could not be parsed back by this class.
+        return Signer.get_authorization_field(authorization, "accessId=")
     
     @staticmethod
     def build_timestamp(request):
