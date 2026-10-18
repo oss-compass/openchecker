@@ -222,8 +222,10 @@ class GitHubRepository(Repository):
         # commit date.
         if self._repo.get_commits(until=creation_time).totalCount:
             first_commit_time = self.get_first_commit_time()
-            first_commit_time=first_commit_time.replace(tzinfo=pytz.timezone('UTC'))
             if first_commit_time:
+                first_commit_time = first_commit_time.replace(
+                    tzinfo=pytz.timezone('UTC')
+                )
                 creation_time = min(creation_time, first_commit_time)
 
         difference = datetime.datetime.now(datetime.timezone.utc) - creation_time
