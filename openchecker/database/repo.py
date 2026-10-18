@@ -79,7 +79,7 @@ def get_generator(client, body, index=None):
                 logger.debug("Too many scrolls open, waiting up to {} seconds".format(sec))
                 time.sleep(1)
                 sec -= 1
-                page = get_items(index=index, body=body, size=page_size, scroll_id=scroll_id)
+                page = get_items(client=client, index=index, body=body, size=page_size, scroll_id=scroll_id)
                 if not page:
                     logger.debug("Waiting for scroll terminated")
                     break
