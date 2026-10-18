@@ -24,10 +24,13 @@ def get_elasticsearch_client(elastic_url):
     )
     return client
 
+client = None
+
+
 def get_client(url):
     """ Get default client by url """
     global client
-    if client:
+    if client is not None:
         return client
     client = get_elasticsearch_client(url)
     return client
