@@ -95,7 +95,7 @@ if __name__ == "__main__":
     projects_file_path = "/home/guoqiang/opencheck/test/projects.json"
     cache_file_path="/home/guoqiang/opencheck/test/.embedding_cache.json"
 
-    with open(projects_file_path, "r") as f:
+    with open(projects_file_path, "r", encoding='utf-8') as f:
         projects = json.load(f)
         all_projects = [{
                     "name": project["_source"]["name"], 
@@ -131,7 +131,7 @@ if __name__ == "__main__":
     vectorized_data = []
 
     if os.path.exists(cache_file_path):
-        with open(cache_file_path, "r") as f:
+        with open(cache_file_path, "r", encoding='utf-8') as f:
             embedding_cache_data = json.load(f)
     
     need_vectorized_data = [ project["description"] for project in all_projects if hash(project["description"]) not in embedding_cache_data ]
@@ -147,7 +147,7 @@ if __name__ == "__main__":
             embedding_cache_data[project_id] = new_embedding_cache_data[index]
             index += 1
             
-    with open(cache_file_path, "w") as f:
+    with open(cache_file_path, "w", encoding='utf-8') as f:
             json.dump(embedding_cache_data, f)
             
     print("Y shape: ", len(vectorized_data))

@@ -11,7 +11,7 @@ def replace_single_quotes_with_regex(s):
 def extract_second_level_categories(yaml_file_path):
     categories = {}
 
-    with open(yaml_file_path, 'r') as file:
+    with open(yaml_file_path, 'r', encoding='utf-8') as file:
         data = yaml.safe_load(file)
 
     for category in data:
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     }
 
     projects = []
-    with open(source_projects_file_path, 'r') as f:
+    with open(source_projects_file_path, 'r', encoding='utf-8') as f:
         projects = json.load(f)
     
     count = 0 
