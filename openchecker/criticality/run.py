@@ -435,6 +435,8 @@ class GitLabRepository(Repository):
                 comments_count += issue.notes.list(as_list=False).total
             except Exception:
                 pass
+        if not self.updated_issues_count:
+            return 0.0
         return round(comments_count / self.updated_issues_count, 1)
 
 
