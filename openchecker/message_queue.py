@@ -62,7 +62,9 @@ def create_queue(config, queue_name, arguments={}):
         queue = channel.queue_declare(queue=queue_name, arguments=arguments)
     except Exception as e:
         logger.error(f"Failed to connect to RabbitMQ: {str(e)}")
-        exit()
+        # A library function must not terminate the caller's process; let the
+        # caller decide what to do with an unreachable broker.
+        raise RuntimeError(f"Failed to connect to RabbitMQ: {str(e)}") from e
 
     connection.close()
 
