@@ -1,3 +1,6 @@
+
+# A slow remote must not hang a worker forever.
+REQUEST_TIMEOUT = 30
 import random
 import time
 import requests, urllib3
@@ -60,6 +63,7 @@ def retry_with_exponential_backoff(
     
 @retry_with_exponential_backoff
 def post_with_backoff(**kwargs):
+    kwargs.setdefault("timeout", REQUEST_TIMEOUT)
     return requests.post(**kwargs)
 
 @retry_with_exponential_backoff
