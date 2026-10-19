@@ -302,6 +302,20 @@ Sources: [openchecker/checkers/document_checker.py L11-L200](https://github.com/
 
 ## Supply Chain and Quality Analysis
 
+### Docker Packaging Workflows
+
+`packaging-checker` inspects `docker/build-push-action` inputs in actual job steps.
+The action defaults to `push: false`, so a build-only step, `load: true`, or a
+local/tar output is not publication evidence. A step with `push: true`, a
+`type=registry` output, or a `type=image,push=true` output is recognized, and the
+reported line points to that step's `uses` entry. Inputs in another step do not
+enable publication for this action.
+
+GitHub expressions in `push` or `outputs` remain potential publication evidence;
+the checker does not execute or evaluate workflow expressions. See the
+[action inputs](https://github.com/docker/build-push-action#inputs) and
+[Docker registry exporters](https://docs.docker.com/build/exporters/image-registry/).
+
 The supply chain analysis encompasses release content verification, signed release detection, and code quality integration through SonarQube.
 
 ### Release Content Analysis System

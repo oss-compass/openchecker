@@ -1,10 +1,69 @@
+import csv
+import io
 import re
+import yaml
 from typing import List, Dict, Tuple, Any
 from pathlib import Path
 from common import get_platform_type, list_workflow_files
 from platform_adapter import platform_manager
 
 COMMAND = 'packaging-checker'
+
+def _yaml_mapping_values(node):
+    """Read mapping nodes without constructing values or losing source marks."""
+    if not isinstance(node, yaml.MappingNode):
+        return {}
+    return {key.value: value for key, value in node.value
+            if isinstance(key, yaml.ScalarNode)}
+
+
+def _enabled_or_expression(node):
+    if not isinstance(node, yaml.ScalarNode):
+        return False
+    return node.value.strip().lower() == 'true' or '${{' in node.value
+
+
+def _publishing_docker_outputs(node):
+    """Recognize registry exporters and image exporters with push enabled."""
+    if not isinstance(node, yaml.ScalarNode):
+        return False
+    if '${{' in node.value:
+        # The workflow can select a publishing exporter at execution time.
+        return True
+    for fields in csv.reader(io.StringIO(node.value), skipinitialspace=True):
+        options = dict(field.strip().split('=', 1) for field in fields if '=' in field)
+        if options.get('type') == 'registry':
+            return True
+        if (options.get('type') == 'image'
+                and options.get('push', '').lower() == 'true'):
+            return True
+    return False
+
+
+def _docker_publication_line(content):
+    """Find a Docker action step configured to publish, keeping its source line.
+
+    Action presence alone is insufficient: push defaults to false. Expressions
+    are retained as potential publication; this scanner does not evaluate them.
+    """
+    workflow = yaml.compose(content, Loader=yaml.SafeLoader)
+    jobs = _yaml_mapping_values(_yaml_mapping_values(workflow).get('jobs'))
+    for job in jobs.values():
+        steps = _yaml_mapping_values(job).get('steps')
+        if not isinstance(steps, yaml.SequenceNode):
+            continue
+        for step in steps.value:
+            values = _yaml_mapping_values(step)
+            action = values.get('uses')
+            if not isinstance(action, yaml.ScalarNode) or not re.fullmatch(
+                    r'docker/build-push-action@\S+', action.value, re.IGNORECASE):
+                continue
+            inputs = _yaml_mapping_values(values.get('with'))
+            if (_enabled_or_expression(inputs.get('push'))
+                    or _publishing_docker_outputs(inputs.get('outputs'))):
+                return action.start_mark.line + 1
+    return 0
+
 
 def _match_pattern_group(content: str, lines: List[str], pattern_group: Dict[str, str]) -> bool:
     """
@@ -105,10 +164,6 @@ def is_packaging_workflow(file_path: str) -> Dict[str, Any]:
         {
             "publish": r"run:.*docker.*push"
         },
-        # Docker build-push-action
-        {
-            "publish": r"uses:\s*docker/build-push-action"
-        },
         # Go 打包
         {
             "setup": r"uses:\s*actions/setup-go",
@@ -140,7 +195,10 @@ def is_packaging_workflow(file_path: str) -> Dict[str, Any]:
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
+        docker_line = _docker_publication_line(content)
         lines = content.split('\n')
+        if docker_line:
+            return create_workflow_match(True, file_path, docker_line)
         
         # 检查每个打包模式
         for pattern_group in packaging_patterns:
