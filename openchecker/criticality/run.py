@@ -556,7 +556,7 @@ def get_repository_score_from_local_csv(file_path, params=None):
             sys.exit(1)
 
     output = []
-    with open(file_path, "r") as fd:
+    with open(file_path, "r", encoding="utf-8") as fd:
         input_data = csv.DictReader(fd, delimiter=',')
         for row in input_data:
             logger.debug(row)
