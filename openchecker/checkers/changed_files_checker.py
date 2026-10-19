@@ -10,6 +10,7 @@ logger = get_logger('openchecker.checkers.changed_files_checker')
 def changed_files_detector(project_url: str, res_payload: dict, commit_hash: str) -> None:
     """
     Changed files detector
+    Git failures are reported as errors rather than successful empty diffs.
     
     Args:
         project_url: Project URL
@@ -31,14 +32,21 @@ def changed_files_detector(project_url: str, res_payload: dict, commit_hash: str
         res_payload["scan_results"]["changed-files-since-commit-detector"] = {"error": str(e)}
         return
 
-    # Get different types of changed files
-    changed_files = _get_diff_files(commit_hash, "ACDMRTUXB")
-    new_files = _get_diff_files(commit_hash, "A")
-    rename_files = _get_diff_files(commit_hash, "R")
-    deleted_files = _get_diff_files(commit_hash, "D")
-    modified_files = _get_diff_files(commit_hash, "M")
-
-    os.chdir(context_path)
+    try:
+        # Get different types of changed files.
+        changed_files = _get_diff_files(commit_hash, "ACDMRTUXB")
+        new_files = _get_diff_files(commit_hash, "A")
+        rename_files = _get_diff_files(commit_hash, "R")
+        deleted_files = _get_diff_files(commit_hash, "D")
+        modified_files = _get_diff_files(commit_hash, "M")
+    except (subprocess.CalledProcessError, OSError) as e:
+        output = getattr(e, "output", None)
+        error = os.fsdecode(output).strip() if output else str(e)
+        logger.error(f"changed-files-since-commit-detector job failed: {error}")
+        res_payload["scan_results"]["changed-files-since-commit-detector"] = {"error": error}
+        return
+    finally:
+        os.chdir(context_path)
 
     res_payload["scan_results"]["changed-files-since-commit-detector"] = {
         "changed_files": changed_files,
@@ -64,14 +72,19 @@ def _get_diff_files(commit_hash: str, type: str = "ACDMRTUXB") -> List[str]:
             
     Returns:
         list: Changed files list
+
+    Raises:
+        subprocess.CalledProcessError: Git cannot produce the requested diff.
+        OSError: The Git process cannot be started.
     """
     try:
+        # Keep the range a revision even when a file has the same name.
         result = subprocess.check_output(
-            ["git", "diff", "--name-only", f"--diff-filter={type}", f"{commit_hash}..HEAD"],
+            ["git", "diff", "--name-only", f"--diff-filter={type}", f"{commit_hash}..HEAD", "--"],
             stderr=subprocess.STDOUT,
             text=True
         )
         return result.strip().split("\n") if result else []
     except subprocess.CalledProcessError as e:
         logger.error(f"failed to get {type} files: {e.output}")
-        return [] 
+        raise
