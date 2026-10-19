@@ -13,6 +13,9 @@
 # limitations under the License.
 """Main python script for calculating OSS Criticality Score."""
 
+
+# A slow remote must not hang a worker forever.
+REQUEST_TIMEOUT = 30
 import argparse
 import csv
 import datetime
@@ -127,7 +130,7 @@ class Repository:
         if 'github.com' in url and _CACHED_GITHUB_TOKEN:
             headers = {'Authorization': f'token {_CACHED_GITHUB_TOKEN}'}
 
-        return requests.get(url, headers=headers)
+        return requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
 
     @property
     def dependents_count(self):
