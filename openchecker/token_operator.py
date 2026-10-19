@@ -47,6 +47,9 @@ def createTokenWithPayload(payload, expires_minutes=None):
     if expires_minutes is None:
         expires_minutes = int(jwt_config.get("expires_minutes", 30))
     
+    # Copy first: assigning 'exp' on the caller's dict leaks the claim into
+    # whatever else reuses that dict.
+    payload = dict(payload)
     expires_in = datetime.datetime.utcnow() + datetime.timedelta(minutes=expires_minutes)
     payload['exp'] = expires_in
     jwt_token = jwt.encode(payload, secret_key, algorithm='HS256')
