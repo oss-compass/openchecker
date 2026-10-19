@@ -274,19 +274,29 @@ class GitCodeAdapter(PlatformAdapter):
             raise ValueError(f"Invalid GitCode URL format: {project_url}")
             
     def get_releases(self, project_url: str) -> Tuple[List[Dict], Optional[str]]:
-        """获取GitCode releases"""
+        """Fetch all GitCode release pages; incomplete reads return an error."""
         try:
             owner_name, repo_name = self.parse_project_url(project_url)
-            url = f"https://api.gitcode.com/api/v5/repos/{owner_name}/{repo_name}/releases?access_token={self.access_token}"
+            url = f"https://api.gitcode.com/api/v5/repos/{owner_name}/{repo_name}/releases"
             
             headers = {'Accept': 'application/json'}
-            response = requests.get(url, headers=headers)
-            
-            if response.status_code == 200:
+            page = 1
+            per_page = 100
+            all_releases = []
+            while True:
+                response = requests.get(url, headers=headers, params={
+                    "access_token": self.access_token,
+                    "page": page, "per_page": per_page,
+                })
+                if response.status_code != 200:
+                    return [], "Not found"
                 releases = response.json()
-                return releases, None
-            else:
-                return [], "Not found"
+                if not isinstance(releases, list):
+                    return [], "Invalid releases response"
+                all_releases.extend(releases)
+                if len(releases) < per_page:
+                    return all_releases, None
+                page += 1
         except Exception as e:
             logger.error(f"Failed to get GitCode releases for repo: {project_url}, Error: {e}")
             return [], f"Failed to get releases for repo: {project_url}"
