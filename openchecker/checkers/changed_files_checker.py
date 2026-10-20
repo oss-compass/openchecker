@@ -27,7 +27,7 @@ def changed_files_detector(project_url: str, res_payload: dict, commit_hash: str
         os.chdir(repository_path)
         logger.info(f"change os path to git repository directory: {repository_path}")
     except OSError as e:
-        logger.error(f"failed to change os path to git repository directory: {e}")
+        logger.exception(f"failed to change os path to git repository directory: {e}")
         res_payload["scan_results"]["changed-files-since-commit-detector"] = {"error": str(e)}
         return
 
@@ -73,5 +73,5 @@ def _get_diff_files(commit_hash: str, type: str = "ACDMRTUXB") -> List[str]:
         )
         return result.strip().split("\n") if result else []
     except subprocess.CalledProcessError as e:
-        logger.error(f"failed to get {type} files: {e.output}")
+        logger.exception(f"failed to get {type} files: {e.output}")
         return [] 
