@@ -41,7 +41,7 @@ def run_criticality_score(project_url: str) -> Tuple[Dict, str]:
                     json_res = json.loads(json_score)
                     criticality_score = json_res['criticality_score']
                 except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse criticality score JSON: {e}")
+                    logger.exception(f"Failed to parse criticality score JSON: {e}")
                     return None, "Failed to parse criticality score JSON."
                 return {"criticality_score": criticality_score}, None
         else:
@@ -69,7 +69,7 @@ def run_scorecard_cli(project_url: str) -> Tuple[Dict, str]:
                 scorecard_json = json.loads(result.stdout)
                 scorecard_json = simplify_scorecard(scorecard_json)
             except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse scorecard JSON: {e}")
+                logger.exception(f"Failed to parse scorecard JSON: {e}")
                 return None, "Failed to parse scorecard JSON."
             return scorecard_json, None
         else:
@@ -205,7 +205,7 @@ def get_package_info(project_url: str) -> Tuple[Dict, str]:
                 "day_enter": day_enter
             }, None
         except Exception as e:
-            logger.error(f"Failed to get package info for {project_url}: {e}")
+            logger.exception(f"Failed to get package info for {project_url}: {e}")
             return {"description": False, "home_url": False, "dependent_count": False, "down_count": False, "day_enter": False}, str(e)
 
 
@@ -260,7 +260,7 @@ def get_ohpm_info(project_url: str) -> Tuple[Dict, str]:
             logger.error("Failed to get ohpm info for repo: {} \n Error: {}".format(project_url, "Not found"))
             return {"down_count": False, "dependent": False, "bedependent": False}, "Not found"
     except Exception as e:
-        logger.error("get_ohpm_info  error: {}".format(e))
+        logger.exception("get_ohpm_info  error: {}".format(e))
         return {"down_count": "", "dependent": "", "bedependent": ""}, None
 
 def get_type_countries(project_url, type) -> Tuple[Dict, str]:
@@ -292,7 +292,7 @@ def get_type_countries(project_url, type) -> Tuple[Dict, str]:
             logger.error("Unsupported platform for {}_countries: {}".format(type, project_url))
             return False, "Unsupported platform"
     except Exception as e:
-        logger.error("get_{}_countries error: {}".format(type, e))
+        logger.exception("get_{}_countries error: {}".format(type, e))
         return False, None
 
 def get_type_organizations(project_url, type)  -> Tuple[Dict, str]:
@@ -324,7 +324,7 @@ def get_type_organizations(project_url, type)  -> Tuple[Dict, str]:
             logger.error("Unsupported platform for {}_organizations: {}".format(type, project_url))
             return False, "Unsupported platform"
     except Exception as e:
-        logger.error("get_{}_organizations error: {}".format(type, e))
+        logger.exception("get_{}_organizations error: {}".format(type, e))
         return False, None
 
 def get_eol_info(project_url: str) -> Tuple[Dict, str]:
@@ -353,7 +353,7 @@ def get_eol_info(project_url: str) -> Tuple[Dict, str]:
                 return {"eol_status": eol_status, "eol_release": eol_release, "eol_time": eol_time}, None
         return {"eol_status": "", "eol_release": "", "eol_time": ""}, None 
     except Exception as e:
-        logger.error("eol_info error: {}".format(e))
+        logger.exception("eol_info error: {}".format(e))
         return {"eol_status": "", "eol_release": "", "eol_time": ""}, None
 
 def criticality_score_checker(project_url: str, res_payload: dict) -> None:
