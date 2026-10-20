@@ -147,7 +147,7 @@ class SBOMChecker:
             return result
             
         except Exception as e:
-            logger.error(f"SBOM check failed: {e}")
+            logger.exception(f"SBOM check failed: {e}")
             return CheckResult(
                 name="SBOM",
                 score=0,
@@ -171,7 +171,7 @@ class SBOMChecker:
                 results.sbom_files.extend(self._check_sbom_source(repo_files))
                 
         except Exception as e:
-            logger.error(f"Error getting SBOM raw data: {e}")
+            logger.exception(f"Error getting SBOM raw data: {e}")
             raise
             
         return results
@@ -419,7 +419,7 @@ def check_sbom_for_project(project_url: str) -> Dict[str, Any]:
         return result
         
     except Exception as e:
-        logger.error(f"SBOM check failed for {project_url}: {e}")
+        logger.exception(f"SBOM check failed for {project_url}: {e}")
         return {
             "error": str(e),
             "status": "failed"
