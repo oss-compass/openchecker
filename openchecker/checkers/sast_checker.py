@@ -1,5 +1,6 @@
 import re
 import yaml
+from xml.etree import ElementTree
 from typing import List, Dict, Tuple, Any
 from pathlib import Path
 from common import get_platform_type, list_workflow_files
@@ -81,6 +82,9 @@ def detect_workflows(repo_path: str, platform_type: str) -> List[Dict]:
 def detect_sonar_config(project_dir: str) -> List[Dict]:
     """
     检测项目中的SonarCloud配置
+
+    Read declared XML property text; comments are not configuration evidence.
+    This does not resolve Maven inheritance, profiles, or property expressions.
     """
     sonar_configs = []
     project_path = Path(project_dir)
@@ -88,20 +92,19 @@ def detect_sonar_config(project_dir: str) -> List[Dict]:
     # 查找pom.xml文件
     for pom_file in project_path.rglob("pom.xml"):
         try:
-            with open(pom_file, 'r', encoding='utf-8') as f:
-                content = f.read()
-                
-            # 检测sonar.host.url配置
-            pattern = r'<sonar\.host\.url>\s*(\S+)\s*</sonar\.host\.url>'
-            match = re.search(pattern, content)
-            
-            if match:
-                sonar_configs.append({
-                    "file_path": str(pom_file),
-                    "type": "sonar",
-                    "url": match.group(1),
-                    "tool_name": "sonar"
-                })
+            root = ElementTree.parse(pom_file).getroot()
+            for element in root.iter():
+                if element.tag.rsplit('}', 1)[-1] != 'sonar.host.url':
+                    continue
+                url = (element.text or '').strip()
+                if url and not any(character.isspace() for character in url):
+                    sonar_configs.append({
+                        "file_path": str(pom_file),
+                        "type": "sonar",
+                        "url": url,
+                        "tool_name": "sonar"
+                    })
+                    break
         except Exception as e:
             continue
     
