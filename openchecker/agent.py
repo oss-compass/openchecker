@@ -313,8 +313,8 @@ def callback_func(ch, method, properties, body):
         try:
             os.chdir(original_cwd)
             logger.info(f"Restored working directory after exception: {os.getcwd()}")
-        except:
-            pass
+        except Exception as e:
+            logger.debug('failed to restore the working directory: %s', e)
 
         _handle_error_and_nack(ch, method, body, str(e))
 
