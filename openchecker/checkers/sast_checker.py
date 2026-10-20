@@ -1,6 +1,9 @@
 import re
 import yaml
 from typing import List, Dict, Tuple, Any
+from logger import get_logger
+
+logger = get_logger('openchecker.checkers.sast_checker')
 from pathlib import Path
 from common import get_platform_type, list_workflow_files
 from platform_adapter import platform_manager
@@ -73,7 +76,7 @@ def detect_workflows(repo_path: str, platform_type: str) -> List[Dict]:
                         "tool_name": tool_type
                     })
         except Exception as e:
-            pass
+            logger.warning('swallowed error: %s', e)
     
     return sast_workflows
 
