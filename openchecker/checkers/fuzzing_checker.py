@@ -2,6 +2,9 @@ import os
 import glob
 import re
 from typing import List, Dict, Tuple
+from logger import get_logger
+
+logger = get_logger('openchecker.checkers.fuzzing_checker')
 from constans import shell_script_handlers
 from common import shell_exec
 from platform_adapter import platform_manager
@@ -122,7 +125,7 @@ def check_clusterfuzz_lite(repo_path: str) -> Dict:
                         'continuous fuzzing solution that runs as part of Continuous Integration (CI) workflows'
                     )
         except Exception as e:
-            pass
+            logger.warning('swallowed error: %s', e)
     
     return create_fuzzing_result(FUZZING_TOOLS['CLUSTERFUZZ_LITE'], False)
     
