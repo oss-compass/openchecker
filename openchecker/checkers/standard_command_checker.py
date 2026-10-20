@@ -1,4 +1,11 @@
 import os
+
+# Resolved once so the checker does not depend on the caller's PATH lookup.
+git_executable = shutil.which("git") or "git"
+criticality_score_executable = shutil.which("criticality_score") or "criticality_score"
+scorecard_executable = shutil.which("scorecard") or "scorecard"
+cloc_executable = shutil.which("cloc") or "cloc"
+import shutil
 import subprocess
 import json
 import re
@@ -27,7 +34,7 @@ def run_criticality_score(project_url: str) -> Tuple[Dict, str]:
         Tuple[Dict, str]: (result, error)
     """
     if "github.com" in project_url:
-        cmd = ["criticality_score", "--repo", project_url, "--format", "json"]
+        cmd = [criticality_score_executable, "--repo", project_url, "--format", "json"]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
             json_str = result.stderr
@@ -62,7 +69,7 @@ def run_scorecard_cli(project_url: str) -> Tuple[Dict, str]:
         Tuple[Dict, str]: (result, error)
     """
     if "github.com" in project_url:
-        cmd = ["scorecard", "--repo", project_url, "--format", "json"]
+        cmd = [scorecard_executable, "--repo", project_url, "--format", "json"]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
             try:
@@ -117,8 +124,8 @@ def get_code_count(project_url: str) -> Tuple[Dict, str]:
     project_name = os.path.basename(project_url).replace('.git', '')
 
     if not os.path.exists(project_name):
-        subprocess.run(["git", "clone", project_url, "--depth=1"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    cmd = ["cloc", project_name, "--json"] 
+        subprocess.run([git_executable, "clone", project_url, "--depth=1"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    cmd = [cloc_executable, project_name, "--json"] 
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode == 0:
         if result.stdout.strip() == "":
