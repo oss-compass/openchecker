@@ -9,6 +9,46 @@ from platform_adapter import platform_manager
 COMMAND = 'dangerous-workflow-checker'
 
 
+class _WorkflowMapping(dict):
+    """A normal workflow mapping with the source line of each YAML key."""
+
+    def __init__(self, key_lines):
+        super().__init__()
+        self.key_lines = key_lines
+
+
+class _WorkflowLoader(yaml.SafeLoader):
+    """Keep source marks without changing the global safe loader."""
+
+
+def _construct_workflow_mapping(loader, node):
+    # Flatten merges first, so inherited keys keep their defining source mark
+    # and a local override wins for both the value and the source location.
+    loader.flatten_mapping(node)
+    mapping = _WorkflowMapping({
+        key.value: key.start_mark.line + 1
+        for key, _ in node.value if isinstance(key, yaml.ScalarNode)
+    })
+    # Yield before constructing children to retain SafeLoader's alias behavior.
+    yield mapping
+    mapping.update(loader.construct_mapping(node))
+
+
+_WorkflowLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_workflow_mapping)
+
+
+def _step_source_line(step, key, fallback):
+    """Use the uses/run key's one-based source line when marks are available.
+
+    Direct callers passing plain dictionaries retain the step-index fallback.
+    Block and folded scripts point to the run key, not a decoded script offset.
+    """
+    if isinstance(step, _WorkflowMapping):
+        return step.key_lines.get(key, fallback)
+    return fallback
+
+
 def has_dangerous_trigger(workflow: Dict[str, Any]) -> bool:
     """检查是否使用危险触发器"""
     # YAML 会把 'on' 解析为 True，所以我们需要检查两种可能的键
@@ -114,7 +154,7 @@ def check_untrusted_checkout(workflow: Dict[str, Any], file_path: str, platform_
                 dangerous_patterns.append({
                     "type": "untrusted_checkout",
                     "file": file_path,
-                    "line": i + 1,
+                    "line": _step_source_line(step, 'uses', i + 1),
                     "job": job_id,
                     "snippet": ref,
                     "message": f"使用不信任的代码检出引用: {ref}"
@@ -153,7 +193,7 @@ def check_script_injection(workflow: Dict[str, Any], file_path: str, platform_ty
                 dangerous_patterns.append({
                     "type": "script_injection",
                     "file": file_path,
-                    "line": i + 1,
+                    "line": _step_source_line(step, 'run', i + 1),
                     "job": job_id,
                     "snippet": var,
                     "message": f"脚本注入风险: 使用了不信任的上下文变量 {var}"
@@ -174,7 +214,7 @@ def check_workflow_file(workflow_file: Path, repo_path: str, platform_type: str)
     try:
         with open(workflow_file, 'r', encoding='utf-8') as f:
             content = f.read()
-        workflow = yaml.safe_load(content)
+        workflow = yaml.load(content, Loader=_WorkflowLoader)
         if not workflow or not isinstance(workflow, dict):
             return workflow_file_item
         # 1. 检查不信任代码检出

@@ -570,3 +570,13 @@ end
  [openchecker/checkers/dangerous_workflow_checker.py L5-L6](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/openchecker/checkers/dangerous_workflow_checker.py#L5-L6)
 
  [openchecker/checkers/webhooks_checker.py L15-L16](https://github.com/Laniakea2012/openchecker/blob/1dbd85d0/openchecker/checkers/webhooks_checker.py#L15-L16)
+
+### Dangerous workflow finding locations
+
+For workflow files, each dangerous-workflow finding's `line` is the one-based
+source line of its `uses` key (untrusted checkout) or `run` key (script injection).
+Block and folded scripts point to the `run` key, rather than an offset in the
+decoded script. YAML aliases and merged fields retain their defining key's line;
+an overriding field points to the override. Helpers called directly with plain
+Python dictionaries retain the existing one-based step-index fallback because
+those dictionaries contain no source marks.
