@@ -1,4 +1,7 @@
 import re
+from logger import get_logger
+
+logger = get_logger('openchecker.checkers.dangerous_workflow_checker')
 import yaml
 from pathlib import Path
 from typing import Any, List, Dict
@@ -181,8 +184,8 @@ def check_workflow_file(workflow_file: Path, repo_path: str, platform_type: str)
         dangerous_patterns.extend(check_untrusted_checkout(workflow, relative_path, platform_type))
         # 2. 检查脚本注入
         dangerous_patterns.extend(check_script_injection(workflow, relative_path, platform_type))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning('failed to analyse workflow: %s', e)
     return workflow_file_item
     
     
