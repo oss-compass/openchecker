@@ -61,7 +61,7 @@ def create_queue(config, queue_name, arguments={}):
         channel = connection.channel()
         queue = channel.queue_declare(queue=queue_name, arguments=arguments)
     except Exception as e:
-        logger.error(f"Failed to connect to RabbitMQ: {str(e)}")
+        logger.exception(f"Failed to connect to RabbitMQ: {str(e)}")
         exit()
 
     connection.close()
@@ -78,7 +78,7 @@ def publish_message(config, queue_name, message_body):
         logger.info(f"Message published successfully")
         return None
     except Exception as e:
-        logger.error(f"Message publishing failed: {e}")
+        logger.exception(f"Message publishing failed: {e}")
         return str(e)
 
 def consumer(config, queue_name, callback_func):
@@ -124,7 +124,7 @@ def consumer(config, queue_name, callback_func):
                         thread_safe_channel.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
                         logger.warning(f"Message NACKed due to error: {method.delivery_tag}")
                     except Exception as nack_error:
-                        logger.error(f"Failed to NACK message: {nack_error}")
+                        logger.exception(f"Failed to NACK message: {nack_error}")
             
             # Submit task to thread pool
             executor.submit(do_work)
@@ -151,19 +151,19 @@ def consumer(config, queue_name, callback_func):
                 connection.process_data_events(time_limit=1)  # Process events once per second
 
         except pika.exceptions.ConnectionClosedByBroker as e:
-            logger.error(f"Broker closed connection: {e}")
+            logger.exception(f"Broker closed connection: {e}")
             logger.info("Retrying in 60 seconds...")
             time.sleep(60)
             continue
 
         except pika.exceptions.AMQPChannelError as e:
-            logger.error(f"AMQP channel error: {e}")
+            logger.exception(f"AMQP channel error: {e}")
             logger.info("Retrying in 60 seconds...")
             time.sleep(60)
             continue
 
         except pika.exceptions.AMQPConnectionError as e:
-            logger.error(f"AMQP connection error: {e}")
+            logger.exception(f"AMQP connection error: {e}")
             logger.info("Retrying in 60 seconds...")
             time.sleep(60)
             continue
@@ -183,7 +183,7 @@ def consumer(config, queue_name, callback_func):
                 try:
                     connection.close()
                 except Exception as e:
-                    logger.error(f"Error closing connection: {e}")
+                    logger.exception(f"Error closing connection: {e}")
     
     # Shutdown thread pool
     executor.shutdown(wait=True)
