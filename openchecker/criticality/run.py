@@ -14,6 +14,9 @@
 """Main python script for calculating OSS Criticality Score."""
 
 import argparse
+from logger import get_logger
+
+logger = get_logger('openchecker.criticality.run')
 import csv
 import datetime
 import json
@@ -174,8 +177,8 @@ class GitHubRepository(Repository):
             return self._last_commit
         try:
             self._last_commit = self._repo.get_commits()[0]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning('failed to read upstream data: %s', e)
         return self._last_commit
 
     def get_first_commit_time(self):
@@ -433,8 +436,8 @@ class GitLabRepository(Repository):
                                             as_list=False):
             try:
                 comments_count += issue.notes.list(as_list=False).total
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning('failed to read upstream data: %s', e)
         return round(comments_count / self.updated_issues_count, 1)
 
 
