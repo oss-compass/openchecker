@@ -3,6 +3,7 @@ import yaml
 import json
 from typing import List, Dict, Tuple, Any
 from pathlib import Path
+from urllib.parse import urlsplit
 from common import get_platform_type, list_workflow_files
 from platform_adapter import platform_manager
 
@@ -181,27 +182,70 @@ def _parse_package_json(package_file: Path) -> List[Dict[str, Any]]:
     return dependencies
 
 
+def _is_download_pinned(url: str, command: str) -> bool:
+    """Recognize commit-addressed GitHub downloads or pip-verified hashes.
+
+    URL keywords, version tags and arbitrary hash-looking path components do
+    not establish a pin. Unknown URL layouts remain unpinned. This is static
+    URL inspection, not validation of a complete shell script or hash pipeline.
+    """
+    try:
+        parsed = urlsplit(url)
+        host = parsed.hostname
+        port = parsed.port
+    except ValueError:
+        return False
+
+    if command == 'pip':
+        # pip verifies URL hash fragments; curl/wget do not. Require one
+        # unambiguous, complete strong hash, without decoding fragment syntax.
+        algorithms = {'sha256': 64, 'sha384': 96, 'sha512': 128}
+        hash_fields = [field.partition('=') for field in parsed.fragment.split('&')
+                       if field.partition('=')[0] in
+                       ('md5', 'sha1', 'sha224', *algorithms)]
+        if len(hash_fields) == 1:
+            algorithm, separator, digest = hash_fields[0]
+            if (separator and algorithm in algorithms
+                    and re.fullmatch(r'[a-fA-F0-9]{%d}' % algorithms[algorithm], digest)):
+                return True
+
+    if parsed.scheme != 'https' or port not in (None, 443):
+        return False
+    parts = parsed.path.strip('/').split('/')
+    if len(parts) < 4 or not all(parts[:2]):
+        return False
+    if host == 'raw.githubusercontent.com':
+        return _is_commit_hash(parts[2])
+    if host == 'github.com':
+        if parts[2] == 'raw' and len(parts) >= 5:
+            return _is_commit_hash(parts[3])
+        if parts[2] == 'archive' and len(parts) == 4:
+            return re.fullmatch(r'[a-fA-F0-9]{40}\.(?:zip|tar\.gz)', parts[3]) is not None
+    if host == 'codeload.github.com' and len(parts) == 4:
+        return parts[2] in ('zip', 'tar.gz') and _is_commit_hash(parts[3])
+    return False
+
+
 def _find_download_commands(line: str) -> List[Tuple[str, bool]]:
     """查找行中的下载命令"""
     downloads = []
     
     # 匹配常见的下载命令
     patterns = [
-        r'curl\s+.*?(?:https?://[^\s]+)',
-        r'wget\s+.*?(?:https?://[^\s]+)',
-        r'pip\s+install\s+.*?(?:https?://[^\s]+)',
-        r'npm\s+install\s+.*?(?:https?://[^\s]+)'
+        ('curl', r'curl\s+.*?(?:https?://[^\s]+)'),
+        ('wget', r'wget\s+.*?(?:https?://[^\s]+)'),
+        ('pip', r'pip\s+install\s+.*?(?:https?://[^\s]+)'),
+        ('npm', r'npm\s+install\s+.*?(?:https?://[^\s]+)')
     ]
     
-    for pattern in patterns:
+    for command, pattern in patterns:
         matches = re.findall(pattern, line, re.IGNORECASE)
         for match in matches:
             # 提取 URL
-            url_match = re.search(r'https?://[^\s]+', match)
+            url_match = re.search(r'''https?://[^\s'"<>]+''', match)
             if url_match:
                 url = url_match.group()
-                # 简单判断是否包含版本信息或哈希
-                is_pinned = any(keyword in url.lower() for keyword in ['version', 'tag', 'commit', 'sha'])
+                is_pinned = _is_download_pinned(url, command)
                 downloads.append((url, is_pinned))
     
     return downloads
