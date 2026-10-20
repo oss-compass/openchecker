@@ -17,7 +17,7 @@ class Signer:
             sign_value = Signer.sign_key(canonical_request, request.get_secret_key())
             return Signer.build_authorization_header(request, timestamp, signed_headers, sign_value)
         except Exception as e:
-            logger.error(f"Error during signing process: {e}")
+            logger.exception(f"Error during signing process: {e}")
             return None
     
     @staticmethod
@@ -28,7 +28,7 @@ class Signer:
         try:
             return int(timestamp)
         except ValueError:
-            logger.error("Invalid timestamp format in authorization header")
+            logger.exception("Invalid timestamp format in authorization header")
             return None
     
     @staticmethod
