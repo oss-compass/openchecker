@@ -292,7 +292,7 @@ class GitHubRepository(Repository):
                 total_tags = self._repo.get_tags().totalCount
             except Exception:
                 # Very large number of tags, i.e. 5000+. Cap at 26.
-                logger.error(f'get_tags is failed: {self._repo.url}')
+                logger.exception(f'get_tags is failed: {self._repo.url}')
                 return RECENT_RELEASES_THRESHOLD
             total = round(
                 (total_tags / days_since_creation) * RELEASE_LOOKBACK_DAYS)
@@ -489,7 +489,7 @@ def get_repository_score(repo_stats, additional_params=None):
                 float(i) for i in additional_param.split(':')
             ]
         except ValueError:
-            logger.error('Parameter value in bad format: ' + additional_param)
+            logger.exception('Parameter value in bad format: ' + additional_param)
             sys.exit(1)
         additional_params_total_weight += weight
         additional_params_score += get_param_score(value, max_threshold,
@@ -552,7 +552,7 @@ def get_repository_score_from_local_csv(file_path, params=None):
         try:
             additional_params = [additional_param.split(':') for additional_param in params]
         except ValueError:
-            logger.error('Parameter value in bad format: ' + params)
+            logger.exception('Parameter value in bad format: ' + params)
             sys.exit(1)
 
     output = []
@@ -636,7 +636,7 @@ def get_repository(url):
         try:
             repo = get_github_auth_token().get_repo(repo_url)
         except github.GithubException as exp:
-            logger.error(f"Get github repository failed: {exp}")
+            logger.exception(f"Get github repository failed: {exp}")
             if exp.status == 404:
                 return None
         return GitHubRepository(repo)
@@ -673,7 +673,7 @@ def override_params(override_params):
                 float(i) for i in temp[1].split(':')
             ]
         except ValueError:
-            logger.error('Override parameter in bad format: ' + override_param)
+            logger.exception('Override parameter in bad format: ' + override_param)
             sys.exit(1)
         if param_name == 'created_since':
             global CREATED_SINCE_WEIGHT, CREATED_SINCE_THRESHOLD
