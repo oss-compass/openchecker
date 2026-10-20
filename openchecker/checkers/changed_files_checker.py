@@ -1,5 +1,9 @@
 import os
+import shutil
 import subprocess
+
+# Resolved once so the checker does not depend on the caller's PATH lookup.
+git_executable = shutil.which("git") or "git"
 from urllib.parse import urlparse
 from typing import List
 from logger import get_logger
@@ -67,7 +71,7 @@ def _get_diff_files(commit_hash: str, type: str = "ACDMRTUXB") -> List[str]:
     """
     try:
         result = subprocess.check_output(
-            ["git", "diff", "--name-only", f"--diff-filter={type}", f"{commit_hash}..HEAD"],
+            [git_executable, "diff", "--name-only", f"--diff-filter={type}", f"{commit_hash}..HEAD"],
             stderr=subprocess.STDOUT,
             text=True
         )
