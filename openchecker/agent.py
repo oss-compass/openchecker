@@ -149,7 +149,7 @@ def ruby_licenses(data: Dict[str, Any]) -> Dict[str, Any]:
                         licenses_name = get_licenses_name(license_info)
                         item['declared_licenses'].append(licenses_name)
                     except json.JSONDecodeError as e:
-                        logger.error(f"Failed to parse JSON from {project_url}: {e}")
+                        logger.exception(f"Failed to parse JSON from {project_url}: {e}")
                 else:
                     logger.error(f"ruby_licenses job failed: {project_url}, error: {error}")
     
@@ -189,7 +189,7 @@ def dependency_checker_output_process(output: bytes) -> Dict[str, Any]:
                 result["packages_without_license_detect"].append(package["purl"])
 
     except Exception as e:
-        logger.error(f"Error processing dependency-checker output: {e}")
+        logger.exception(f"Error processing dependency-checker output: {e}")
         return {}
 
     return result
@@ -345,7 +345,7 @@ def _download_project_source(project_url: str, version_number: str) -> bool:
             return False
             
     except Exception as e:
-        logger.error(f"Source code download exception: {e}")
+        logger.exception(f"Source code download exception: {e}")
         return False
 
 
@@ -366,7 +366,7 @@ def _generate_lock_files(project_url: str) -> None:
             logger.error(f"Lock files generation failed: {project_url}, error: {error}")
             
     except Exception as e:
-        logger.error(f"Lock files generation exception: {e}")
+        logger.exception(f"Lock files generation exception: {e}")
 
 
 def _execute_commands(
@@ -427,7 +427,7 @@ def _execute_commands(
             try:
                 command_switch[command]()
             except Exception as e:
-                logger.error(f"Error executing command {command}: {e}")
+                logger.exception(f"Error executing command {command}: {e}")
                 res_payload["scan_results"][command] = {"error": str(e)}
         else:
             logger.warning(f"Unknown command: {command}")
@@ -464,7 +464,7 @@ def _handle_shell_script_command(
             res_payload["scan_results"][command] = {"error": error.decode("utf-8")}
             
     except Exception as e:
-        logger.error(f"{command} job failed: {project_url}, error: {e}")
+        logger.exception(f"{command} job failed: {project_url}, error: {e}")
         res_payload["scan_results"][command] = {"error": str(e)}
 
 
@@ -517,7 +517,7 @@ def _cleanup_project_source(project_url: str) -> None:
             logger.warning(f"Source code cleanup failed: {project_url}, error: {error}")
             
     except Exception as e:
-        logger.error(f"Exception during source cleanup: {e}")
+        logger.exception(f"Exception during source cleanup: {e}")
 
 
 def _send_results(callback_url: str, res_payload: Dict[str, Any]) -> None:
@@ -536,7 +536,7 @@ def _send_results(callback_url: str, res_payload: Dict[str, Any]) -> None:
             else:
                 logger.error(f"Failed to send results: {err}")
         except Exception as e:
-            logger.error(f"Exception sending results: {e}")
+            logger.exception(f"Exception sending results: {e}")
 
 
 def _handle_error_and_nack(ch, method, body, error_msg: str) -> None:
@@ -596,7 +596,7 @@ def parse_oat_txt_to_json(txt: str) -> Dict[str, Any]:
                     result[current_section]["details"].append(entry)
         return result
     except Exception as e:
-        logger.error(f"parse_oat_txt error: {e}")
+        logger.exception(f"parse_oat_txt error: {e}")
         return {"error": str(e)}
 
 if __name__ == "__main__":
