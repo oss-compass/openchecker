@@ -149,6 +149,29 @@ def _extract_job_level_permissions(workflow: Dict, file_path: str) -> List[Dict[
     return permissions
 
 
+def _mapping_member(loader, node, name):
+    """Locate the effective mapping entry, preserving SafeLoader key semantics."""
+    if isinstance(node, yaml.MappingNode):
+        for key_node, value_node in reversed(node.value):
+            if loader.construct_object(key_node) == name:
+                return key_node, value_node
+    return None, None
+
+
+def _set_permission_source_lines(loader, workflow_node, permissions):
+    """Attach declaration lines; mapping aliases retain their definition marks."""
+    for permission in permissions:
+        scope_node = workflow_node
+        if permission['location_type'] == PERMISSION_LOCATION_JOB:
+            _, jobs_node = _mapping_member(loader, workflow_node, 'jobs')
+            _, scope_node = _mapping_member(loader, jobs_node, permission['job_name'])
+        key_node, value_node = _mapping_member(loader, scope_node, 'permissions')
+        if isinstance(value_node, yaml.MappingNode):
+            key_node, _ = _mapping_member(loader, value_node, permission['name'])
+        if key_node is not None:
+            permission['line_number'] = key_node.start_mark.line + 1
+
+
 def _extract_workflow_permissions(workflow_file: str, repo_path: str) -> List[Dict[str, Any]]:
     """
     从单个workflow文件中提取权限信息
@@ -164,20 +187,19 @@ def _extract_workflow_permissions(workflow_file: str, repo_path: str) -> List[Di
     
     try:
         with open(workflow_file, 'r', encoding='utf-8') as f:
-            workflow_content = yaml.safe_load(f)
-        
-        if not workflow_content:
-            return permissions
-            
-        relative_path = os.path.relpath(workflow_file, repo_path)
-        
-        # 1. 提取top级别权限
-        top_permissions = _extract_top_level_permissions(workflow_content, relative_path)
-        permissions.extend(top_permissions)
-        
-        # 2. 提取job级别权限
-        job_permissions = _extract_job_level_permissions(workflow_content, relative_path)
-        permissions.extend(job_permissions)
+            loader = yaml.SafeLoader(f)
+            try:
+                workflow_node = loader.get_single_node()
+                workflow_content = loader.construct_document(workflow_node) if workflow_node is not None else None
+                if not workflow_content:
+                    return permissions
+
+                relative_path = os.path.relpath(workflow_file, repo_path)
+                permissions.extend(_extract_top_level_permissions(workflow_content, relative_path))
+                permissions.extend(_extract_job_level_permissions(workflow_content, relative_path))
+                _set_permission_source_lines(loader, workflow_node, permissions)
+            finally:
+                loader.dispose()
         
     except Exception as e:
         pass

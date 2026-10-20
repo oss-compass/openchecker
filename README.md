@@ -162,6 +162,10 @@ flowchart TD
 | **maintainers-checker** | 维护者信息验证 | JSON |
 | **languages-detector** | 编程语言识别和统计 | JSON |
 
+### 权限扫描结果定位
+
+`token-permissions-checker`结果中的`line_number`从1开始计数：简写权限指向`permissions`声明所在行，权限映射中的条目指向对应权限名所在行。映射别名及合并条目保留实际定义位置，显式覆盖指向覆盖位置；标量别名指向使用该别名的`permissions`声明。这里只沿用现有SafeLoader解析语义，不代表各平台都支持所有YAML合并写法。未声明权限仍保留原有第1行占位值；权限值、级别和未声明状态的提取规则不变。
+
 ## 📚 核心文档
 
 - [📋 系统架构设计](./docs/design/openchecker_architecture_design.md) - 完整的系统架构设计规范
