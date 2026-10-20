@@ -3,7 +3,8 @@ from secrets import compare_digest
 from helper import read_config
 
 class User:
-    def __init__(self, id, username, password, access=['request']):
+    def __init__(self, id, username, password, access=None):
+        access = ['request'] if access is None else list(access)
         self.id = id
         self.name = username
         self.password = password
