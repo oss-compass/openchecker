@@ -24,6 +24,29 @@ PINNING_RESULT_UNPINNED = "unpinned"
 PINNING_RESULT_UNKNOWN = "unknown"
 
 
+class _WorkflowMapping(dict):
+    """Native workflow mapping retaining each effective key's source line."""
+
+
+class _WorkflowLoader(yaml.SafeLoader):
+    """Keep standard safe YAML construction, including aliases and merges."""
+
+
+def _construct_workflow_mapping(loader, node):
+    loader.flatten_mapping(node)
+    mapping = _WorkflowMapping()
+    yield mapping
+    mapping.update(loader.construct_mapping(node))
+    mapping.key_lines = {
+        loader.construct_object(key): key.start_mark.line + 1
+        for key, value in node.value
+    }
+
+
+_WorkflowLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_workflow_mapping)
+
+
 def create_dependency(name: str, version: str, dep_type: str, file_path: str, 
                      line_number: int, is_pinned: bool, is_owned: bool = False, 
                      snippet: str = "") -> Dict[str, Any]:
@@ -239,7 +262,11 @@ def collect_dependencies(repo_path: str, platform_type: str) -> List[Dict[str, A
 
 
 def _collect_actions(repo_path: Path, platform_type: str) -> List[Dict[str, Any]]:
-    """收集 Actions 工作流中的依赖"""
+    """Collect decoded job/step uses values and their declaration locations.
+
+    A scalar alias points to the using key; a merged property retains its
+    definition line. This reads YAML values without evaluating expressions.
+    """
     dependencies = []
     
     workflow_files = list_workflow_files(repo_path, platform_type)
@@ -247,23 +274,34 @@ def _collect_actions(repo_path: Path, platform_type: str) -> List[Dict[str, Any]
         try:
             with open(workflow_file, 'r', encoding='utf-8') as f:
                 content = f.read()
-                data = yaml.safe_load(content)
+                data = yaml.load(content, Loader=_WorkflowLoader)
             
             if not isinstance(data, dict):
                 continue
                 
-            # 解析工作流中的 uses 字段
             lines = content.split('\n')
-            for line_num, line in enumerate(lines, 1):
-                uses_match = re.search(r'uses:\s*([^\s#]+)', line)
-                if uses_match:
-                    action_ref = uses_match.group(1).strip()
-                    
+            jobs = data.get('jobs', {})
+            if not isinstance(jobs, dict):
+                continue
+            for job in jobs.values():
+                if not isinstance(job, dict):
+                    continue
+                steps = job.get('steps', [])
+                declarations = [job] + (steps if isinstance(steps, list) else [])
+                for declaration in declarations:
+                    if not isinstance(declaration, _WorkflowMapping):
+                        continue
+                    action_ref = declaration.get('uses')
+                    if not isinstance(action_ref, str):
+                        continue
+                    action_ref = action_ref.strip()
                     # 解析 action 引用格式: owner/repo@ref
                     action_parts = action_ref.split('@')
                     if len(action_parts) == 2:
                         action_name = action_parts[0]
                         ref = action_parts[1]
+                        line_num = declaration.key_lines['uses']
+                        line = lines[line_num - 1]
                         
                         # 判断是否为 官方 Action
                         is_owned = _is_owned_action(action_name, platform_type)
