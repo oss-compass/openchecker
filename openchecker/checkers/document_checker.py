@@ -154,7 +154,7 @@ def api_doc_checker(project_url: str, res_payload: dict) -> None:
             logger.error(f"api-doc-checker job failed: {project_url}, error: {error}")
             res_payload["scan_results"]["api-doc-checker"] = {"error": error}
     except Exception as e:
-        logger.error(f"api-doc-checker job failed: {project_url}, error: {e}")
+        logger.exception(f"api-doc-checker job failed: {project_url}, error: {e}")
         res_payload["scan_results"]["api-doc-checker"] = {"error": str(e)}
 
 
@@ -175,7 +175,7 @@ def build_doc_checker(project_url: str, res_payload: dict) -> None:
             logger.error(f"build-doc-checker job failed: {project_url}, error: {error}")
             res_payload["scan_results"]["build-doc-checker"] = {"error": error}
     except Exception as e:
-        logger.error(f"build-doc-checker job failed: {project_url}, error: {e}")
+        logger.exception(f"build-doc-checker job failed: {project_url}, error: {e}")
         res_payload["scan_results"]["build-doc-checker"] = {"error": str(e)}
 
 
@@ -196,5 +196,5 @@ def readme_opensource_checker(project_url: str, res_payload: dict) -> None:
             logger.error(f"readme-opensource-checker job failed: {project_url}, error: {error}")
             res_payload["scan_results"]["readme-opensource-checker"] = {"error": error}
     except Exception as e:
-        logger.error(f"readme-opensource-checker job failed: {project_url}, error: {e}")
+        logger.exception(f"readme-opensource-checker job failed: {project_url}, error: {e}")
         res_payload["scan_results"]["readme-opensource-checker"] = {"error": str(e)} 
