@@ -5,6 +5,9 @@ from typing import List, Dict, Tuple, Any
 from pathlib import Path
 from common import get_platform_type, list_workflow_files
 from platform_adapter import platform_manager
+from logger import get_logger
+
+logger = get_logger('openchecker.checkers.pinned_dependencies_checker')
 
 
 COMMAND = 'pinned-dependencies-checker'
@@ -144,7 +147,8 @@ def _parse_requirements_file(req_file: Path) -> List[Dict[str, Any]]:
                 dependencies.append(dep)
                 
     except Exception as e:
-        pass
+                
+        logger.warning('failed to read pinned dependencies: %s', e)
     
     return dependencies
 
@@ -176,7 +180,8 @@ def _parse_package_json(package_file: Path) -> List[Dict[str, Any]]:
                 dependencies.append(dep)
                 
     except Exception as e:
-        pass
+                
+        logger.warning('failed to read pinned dependencies: %s', e)
     
     return dependencies
 
@@ -284,7 +289,8 @@ def _collect_actions(repo_path: Path, platform_type: str) -> List[Dict[str, Any]
                         dependencies.append(dep)
                         
         except Exception as e:
-            pass
+                        
+            logger.warning('failed to read pinned dependencies: %s', e)
             
     return dependencies
 
@@ -330,7 +336,8 @@ def _collect_docker_dependencies(repo_path: Path) -> List[Dict[str, Any]]:
                     dependencies.append(dep)
                     
         except Exception as e:
-            pass
+                    
+            logger.warning('failed to read pinned dependencies: %s', e)
             
     return dependencies
 
@@ -391,7 +398,8 @@ def _collect_script_downloads(repo_path: Path) -> List[Dict[str, Any]]:
                     dependencies.append(dep)
                     
         except Exception as e:
-            pass
+                    
+            logger.warning('failed to read pinned dependencies: %s', e)
     
     return dependencies
 
