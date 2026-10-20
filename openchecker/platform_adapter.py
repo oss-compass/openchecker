@@ -131,7 +131,7 @@ class GitHubAdapter(PlatformAdapter):
                 all_releases.extend(page)
             return all_releases, None
         except Exception as e:
-            logger.error(f"Failed to get GitHub releases for repo: {project_url}, Error: {e}")
+            logger.exception(f"Failed to get GitHub releases for repo: {project_url}, Error: {e}")
             return [], f"Failed to get releases for repo: {project_url}"
             
     def get_zipball_url(self, project_url: str, tag: str) -> Optional[str]:
@@ -165,7 +165,7 @@ class GitHubAdapter(PlatformAdapter):
             else:
                 return {}, "Repository not found"
         except Exception as e:
-            logger.error(f"Failed to get GitHub repo info for {project_url}: {e}")
+            logger.exception(f"Failed to get GitHub repo info for {project_url}: {e}")
             return {}, str(e)
             
     def get_download_stats(self, project_url: str) -> Tuple[Dict, Optional[str]]:
@@ -212,7 +212,7 @@ class GiteeAdapter(PlatformAdapter):
             else:
                 return [], "Not found"
         except Exception as e:
-            logger.error(f"Failed to get Gitee releases for repo: {project_url}, Error: {e}")
+            logger.exception(f"Failed to get Gitee releases for repo: {project_url}, Error: {e}")
             return [], f"Failed to get releases for repo: {project_url}"
             
     def get_zipball_url(self, project_url: str, tag: str) -> Optional[str]:
@@ -241,7 +241,7 @@ class GiteeAdapter(PlatformAdapter):
             else:
                 return {}, "Repository not found"
         except Exception as e:
-            logger.error(f"Failed to get Gitee repo info for {project_url}: {e}")
+            logger.exception(f"Failed to get Gitee repo info for {project_url}: {e}")
             return {}, str(e)
             
     def get_download_stats(self, project_url: str) -> Tuple[Dict, Optional[str]]:
@@ -288,7 +288,7 @@ class GitCodeAdapter(PlatformAdapter):
             else:
                 return [], "Not found"
         except Exception as e:
-            logger.error(f"Failed to get GitCode releases for repo: {project_url}, Error: {e}")
+            logger.exception(f"Failed to get GitCode releases for repo: {project_url}, Error: {e}")
             return [], f"Failed to get releases for repo: {project_url}"
             
     def get_zipball_url(self, project_url: str, tag: str) -> Optional[str]:
@@ -317,7 +317,7 @@ class GitCodeAdapter(PlatformAdapter):
             else:
                 return {}, "Repository not found"
         except Exception as e:
-            logger.error(f"Failed to get GitCode repo info for {project_url}: {e}")
+            logger.exception(f"Failed to get GitCode repo info for {project_url}: {e}")
             return {}, str(e)
             
     def get_download_stats(self, project_url: str) -> Tuple[Dict, Optional[str]]:
@@ -346,7 +346,7 @@ class GitCodeAdapter(PlatformAdapter):
             else:
                 return {}, "Download statistics not found"
         except Exception as e:
-            logger.error(f"Failed to get GitCode download stats for {project_url}: {e}")
+            logger.exception(f"Failed to get GitCode download stats for {project_url}: {e}")
             return {}, str(e)
 
 
