@@ -1,10 +1,14 @@
 import os
+import shutil
 import subprocess
 import json
 import re
 import time
 import requests
 import yaml
+
+# Resolved once so the checker does not depend on the caller's PATH lookup.
+git_executable = shutil.which("git") or "git"
 from typing import Dict, Tuple, Any
 from logger import get_logger
 from aksk.default_request import DefaultRequest
@@ -117,7 +121,7 @@ def get_code_count(project_url: str) -> Tuple[Dict, str]:
     project_name = os.path.basename(project_url).replace('.git', '')
 
     if not os.path.exists(project_name):
-        subprocess.run(["git", "clone", project_url, "--depth=1"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run([git_executable, "clone", project_url, "--depth=1"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     cmd = ["cloc", project_name, "--json"] 
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode == 0:
