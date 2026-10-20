@@ -18,6 +18,12 @@ class TestUserFunctions(unittest.TestCase):
         createUser("newuser", "newpassword", ["newaccess"])
         self.assertTrue(any(u.name == "newuser" for u in self.userList))
 
+    def test_created_user_is_indexed(self):
+        created = createUser("indexed", "pw", ["request"])
+        self.assertIs(indexUserWithName("indexed"), created)
+        self.assertIs(indexUserWithID(created.id), created)
+        self.assertIsNotNone(authenticate("indexed", "pw"))
+
     def test_indexUserWithID(self):
         first_user = self.userList[0]
         found_user = indexUserWithID(first_user.id)

@@ -18,7 +18,13 @@ usernameTable = {u.name: u for u in userList}
 useridTable = {u.id: u for u in userList}
 
 def createUser(username, password, access):
-    userList.append(User(str(uuid.uuid5(uuid.NAMESPACE_DNS, username)), username, password, access))
+    user = User(str(uuid.uuid5(uuid.NAMESPACE_DNS, username)), username, password, access)
+    userList.append(user)
+    # The id/name indexes are built once from the initial userList, so a new user
+    # has to be registered in them or it can never be found by authenticate().
+    usernameTable[user.name] = user
+    useridTable[user.id] = user
+    return user
 
 def indexUserWithID(userID):
     return useridTable.get(userID, None)
