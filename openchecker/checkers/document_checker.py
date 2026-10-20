@@ -1,6 +1,10 @@
 import os
+import shutil
 import subprocess
 import json
+
+# Resolved once so the checker does not depend on the caller's PATH lookup.
+git_executable = shutil.which("git") or "git"
 from typing import List, Tuple, Any
 from exponential_backoff import completion_with_backoff
 from logger import get_logger
@@ -22,7 +26,7 @@ def check_doc_content(project_url: str, doc_type: str) -> Tuple[List[str], str]:
     project_name = os.path.basename(project_url).replace('.git', '')
 
     if not os.path.exists(project_name):
-        subprocess.run(["git", "clone", project_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run([git_executable, "clone", project_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     dir_list = [project_name, project_name + '/' + 'doc', project_name + '/' + 'docs']
 
@@ -107,7 +111,7 @@ def check_readme_opensource(project_url: str) -> Tuple[bool, str]:
     project_name = os.path.basename(project_url).replace('.git', '')
 
     if not os.path.exists(project_name):
-        subprocess.run(["git", "clone", project_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run([git_executable, "clone", project_url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     readme_file = os.path.join(project_name, "README.OpenSource")
     if os.path.isfile(readme_file):
         with open(readme_file, 'r', encoding='utf-8') as file:
