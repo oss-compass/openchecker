@@ -139,7 +139,7 @@ def sonar_checker(project_url: str, res_payload: dict, config: dict) -> None:
             res_payload["scan_results"]["sonar-scanner"] = {"error": error.decode("utf-8")}
             
     except Exception as e:
-        logger.error(f"sonar-scanner job failed: {project_url}, error: {e}")
+        logger.exception(f"sonar-scanner job failed: {project_url}, error: {e}")
         res_payload["scan_results"]["sonar-scanner"] = {"error": str(e)}
 
 
@@ -177,10 +177,10 @@ def _check_sonar_project_exists(project_name: str, sonar_config: dict) -> bool:
             return False
             
     except requests.exceptions.RequestException as e:
-        logger.error(f"Call sonarqube projects search api failed with error: {e}")
+        logger.exception(f"Call sonarqube projects search api failed with error: {e}")
         return False
     except Exception as e:
-        logger.error(f"Exception checking SonarQube project: {e}")
+        logger.exception(f"Exception checking SonarQube project: {e}")
         return False
 
 
@@ -209,9 +209,9 @@ def _create_sonar_project(project_name: str, sonar_config: dict) -> None:
             logger.error(f"Call sonarqube projects create api failed with status code: {response.status_code}")
             
     except requests.exceptions.RequestException as e:
-        logger.error(f"Call sonarqube projects create api failed with error: {e}")
+        logger.exception(f"Call sonarqube projects create api failed with error: {e}")
     except Exception as e:
-        logger.error(f"Exception creating SonarQube project: {e}")
+        logger.exception(f"Exception creating SonarQube project: {e}")
 
 
 def _get_analysis_logs(project_name: str, sonar_config: dict) -> dict:
@@ -381,8 +381,8 @@ def _query_sonar_measures(project_name: str, sonar_config: dict) -> dict:
             return {"error": f"Query failed with status code: {response.status_code}"}
             
     except requests.exceptions.RequestException as e:
-        logger.error(f"Querying sonar-scanner report failed with error: {e}")
+        logger.exception(f"Querying sonar-scanner report failed with error: {e}")
         return {"error": f"Query failed: {str(e)}"}
     except Exception as e:
-        logger.error(f"Exception querying SonarQube measures: {e}")
+        logger.exception(f"Exception querying SonarQube measures: {e}")
         return {"error": f"Query exception: {str(e)}"} 
