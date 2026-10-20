@@ -4,6 +4,9 @@ import re
 import yaml
 import json
 from typing import List, Dict, Tuple, Any
+from logger import get_logger
+
+logger = get_logger('openchecker.checkers.token_permissions_checker')
 from pathlib import Path
 from common import get_platform_type, list_workflow_files
 from platform_adapter import platform_manager
@@ -180,7 +183,8 @@ def _extract_workflow_permissions(workflow_file: str, repo_path: str) -> List[Di
         permissions.extend(job_permissions)
         
     except Exception as e:
-        pass
+        
+        logger.warning('swallowed error: %s', e)
         
     return permissions
 
