@@ -53,12 +53,14 @@ def _is_owned_action(action_name: str, platform_type: str) -> bool:
 
 def _parse_docker_image(image_ref: str) -> Tuple[str, str]:
     """解析 Docker 镜像引用"""
-    if ':' in image_ref:
-        name, tag = image_ref.rsplit(':', 1)
-        return name, tag
-    elif '@' in image_ref:
+    # 摘要引用（name@sha256:...）同时包含 : 与 @，必须先判 @：先判 : 会把
+    # 引用拆成损坏的 ("name@sha256", "<hex>")，摘要钉版镜像被误判未钉版。
+    if '@' in image_ref:
         name, digest = image_ref.split('@', 1)
         return name, digest
+    elif ':' in image_ref:
+        name, tag = image_ref.rsplit(':', 1)
+        return name, tag
     else:
         return image_ref, 'latest'
 

@@ -177,10 +177,12 @@ class TestSecurityPolicyChecker(unittest.TestCase):
         # 执行测试
         result = security_policy_checker.analyze_security_policy_content(security_file)
         
-        # 验证结果
+        # 验证结果（与 analyze_security_policy_content 的实际契约对齐：
+        # file_size / urls / emails / disclosure_keywords）
         self.assertIsInstance(result, dict)
-        self.assertIn("has_reporting_section", result)
-        self.assertIn("has_supported_versions", result)
+        self.assertGreater(result["file_size"], 0)
+        self.assertIn("security@example.com", result["emails"])
+        self.assertIsInstance(result["disclosure_keywords"], list)
 
 
 class TestTokenPermissionsChecker(unittest.TestCase):
@@ -216,10 +218,13 @@ class TestTokenPermissionsChecker(unittest.TestCase):
         self.assertIsInstance(result, list)
         self.assertTrue(len(result) > 0)
         
-        # 检查权限项
-        permission_names = [p["permission"] for p in result]
-        self.assertIn("contents", permission_names)
-        self.assertIn("actions", permission_names)
+        # 检查权限项（实际键为 name / value / permission_level）
+        by_name = {p["name"]: p for p in result}
+        self.assertIn("contents", by_name)
+        self.assertIn("actions", by_name)
+        self.assertEqual(by_name["contents"]["value"], "read")
+        self.assertEqual(by_name["contents"]["permission_level"],
+                         token_permissions_checker.PERMISSION_LEVEL_READ)
 
 
 class TestFuzzingChecker(unittest.TestCase):
@@ -289,21 +294,19 @@ class TestBinaryChecker(unittest.TestCase):
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
 
-    @patch('openchecker.checkers.binary_checker.platform_manager')
-    def test_binary_checker_success(self, mock_platform):
-        """测试二进制检查器成功执行"""
-        # 设置模拟
-        mock_platform.download_project_source.return_value = (True, "")
-        
-        # 创建响应载荷
+    @patch('openchecker.checkers.binary_checker.shell_exec')
+    def test_binary_checker_success(self, mock_exec):
+        """测试二进制检查器成功执行（真实依赖是 scripts/binary_checker.sh 的 shell_exec）"""
+        mock_exec.return_value = (
+            b"Binary file found: logo.png\nBinary archive found: data.zip\n", None)
+
         res_payload = {"scan_results": {}}
-        
-        # 执行测试
-        project_url = "https://github.com/test/repo"
-        binary_checker.binary_checker(project_url, res_payload)
-        
-        # 验证结果
-        self.assertIn("binary-checker", res_payload["scan_results"])
+        binary_checker.binary_checker("https://github.com/test/repo", res_payload)
+
+        self.assertEqual(res_payload["scan_results"]["binary-checker"]["binary_file_list"],
+                         ["logo.png"])
+        self.assertEqual(res_payload["scan_results"]["binary-checker"]["binary_archive_list"],
+                         ["data.zip"])
 
     def test_detect_binary_files(self):
         """测试检测二进制文件"""
@@ -324,39 +327,25 @@ class TestBinaryChecker(unittest.TestCase):
 class TestURLChecker(unittest.TestCase):
     """URL检查器测试类"""
 
-    @patch('openchecker.checkers.url_checker.platform_manager')
-    def test_url_checker_valid_url(self, mock_platform):
-        """测试有效URL检查"""
-        # 设置模拟
-        mock_adapter = Mock()
-        mock_adapter.is_valid_project_url.return_value = True
-        mock_platform.get_adapter.return_value = mock_adapter
-        
-        # 创建响应载荷
-        res_payload = {"scan_results": {}}
-        
-        # 执行测试
-        project_url = "https://github.com/test/repo"
-        url_checker.url_checker(project_url, res_payload)
-        
-        # 验证结果
-        self.assertIn("url-checker", res_payload["scan_results"])
+    @patch('openchecker.checkers.url_checker.requests.get')
+    def test_url_checker_valid_url(self, mock_get):
+        """测试有效URL检查（真实依赖是 requests.get）"""
+        mock_get.return_value = Mock(status_code=200)
 
-    @patch('openchecker.checkers.url_checker.platform_manager')
-    def test_url_checker_invalid_url(self, mock_platform):
-        """测试无效URL检查"""
-        # 设置模拟
-        mock_platform.get_adapter.return_value = None
-        
-        # 创建响应载荷
         res_payload = {"scan_results": {}}
-        
-        # 执行测试
-        project_url = "invalid-url"
-        url_checker.url_checker(project_url, res_payload)
-        
-        # 验证结果
-        self.assertIn("url-checker", res_payload["scan_results"])
+        url_checker.url_checker("https://github.com/test/repo", res_payload)
+
+        self.assertTrue(res_payload["scan_results"]["url-checker"]["is_accessible"])
+
+    @patch('openchecker.checkers.url_checker.requests.get')
+    def test_url_checker_invalid_url(self, mock_get):
+        """测试无效URL检查（连接失败走 error 通道）"""
+        mock_get.side_effect = url_checker.requests.exceptions.ConnectionError("boom")
+
+        res_payload = {"scan_results": {}}
+        url_checker.url_checker("invalid-url", res_payload)
+
+        self.assertIn("error", res_payload["scan_results"]["url-checker"])
 
 
 class TestSonarChecker(unittest.TestCase):

@@ -9,10 +9,10 @@ COMMAND = 'sast-checker'
 
 # SAST工具正则表达式映射
 SAST_TOOL_PATTERNS = {
-    "codeql": r"^codeql-action/analyze$",
+    "codeql": r"^github/codeql-action/(init|analyze)(@|$)",
     "snyk": r"^snyk/actions/.*",
-    "pysa": r"^facebook/pysa-action$",
-    "qodana": r"^JetBrains/qodana-action$",
+    "pysa": r"^facebook/pysa-action(@|$)",
+    "qodana": r"^JetBrains/qodana-action(@|$)",
 }
 
 def _parse_workflow_for_sast_tools(workflow_content: str) -> List[str]:
@@ -48,7 +48,7 @@ def _parse_workflow_for_sast_tools(workflow_content: str) -> List[str]:
     except yaml.YAMLError:
         # 如果YAML解析失败，尝试用正则表达式检测
         for tool_name, pattern in SAST_TOOL_PATTERNS.items():
-            if re.search(f'uses:\\s*["\']?{pattern}["\']?', workflow_content):
+            if re.search(f'uses:\\s*["\']?{pattern.lstrip(chr(94))}["\']?', workflow_content):
                 detected_tools.append(tool_name)
     
     return list(set(detected_tools)) 
