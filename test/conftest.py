@@ -19,6 +19,9 @@ import logging
 
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+# checkers 使用兄弟绝对导入（from common import ...）：openchecker/ 自身也需在 sys.path，
+# 否则整个 test_checkers.py 在收集期即 ModuleNotFoundError: No module named 'common'。
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'openchecker'))
 
 # Mock the imports that might not be available during testing
 try:
