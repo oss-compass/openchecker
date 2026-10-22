@@ -70,7 +70,7 @@ def check_doc_content(project_url: str, doc_type: str) -> Tuple[List[str], str]:
 
     satisfied_doc_file = []
     for document in documents:
-        with open(document, 'r') as file:
+        with open(document, 'r', encoding='utf-8') as file:
             markdown_text = file.read()
             chunk_size = 3000
             chunks = [markdown_text[i:i+chunk_size] for i in range(0, len(markdown_text), chunk_size)]
