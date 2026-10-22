@@ -290,6 +290,150 @@ def _collect_actions(repo_path: Path, platform_type: str) -> List[Dict[str, Any]
 
 
 
+def _dockerfile_words(text: str) -> List[str]:
+    """Keep quotes and escapes so literal << strings are not redirections."""
+    words = []
+    start = None
+    quote = None
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if quote is None and char.isspace():
+            if start is not None:
+                words.append(text[start:index])
+                start = None
+            index += 1
+            continue
+        if start is None:
+            start = index
+        if char == '\\' and quote != "'":
+            index += 2
+            continue
+        if quote is None and char in "\"'":
+            quote = char
+        elif char == quote:
+            quote = None
+        index += 1
+    if start is not None:
+        words.append(text[start:])
+    return words
+
+
+def _dockerfile_delimiter(word: str):
+    """Remove delimiter quoting without evaluating the build environment."""
+    result = []
+    quote = None
+    index = 0
+    while index < len(word):
+        char = word[index]
+        if char == '\\' and quote != "'":
+            if index + 1 == len(word):
+                return None
+            following = word[index + 1]
+            if quote != '"' or following in ('"', '$', '\\'):
+                result.append(following)
+                index += 2
+                continue
+        if quote is None and char in "\"'":
+            quote = char
+        elif char == quote:
+            quote = None
+        else:
+            if quote != "'" and word.startswith('${', index):
+                end = word.find('}', index + 2)
+                # Modifier expressions are not literal header words in Docker's
+                # lexer. Inferring a boundary could hide later FROM instructions.
+                if end < 0 or not re.fullmatch(r'\w+', word[index + 2:end]):
+                    return None
+            result.append(char)
+        index += 1
+    if quote is not None:
+        return None
+    return ''.join(result) or None
+
+
+def _dockerfile_heredocs(instruction: str) -> List[Tuple[str, bool]]:
+    parts = instruction.split(None, 1)
+    if len(parts) != 2:
+        return []
+    command, arguments = parts
+    if command.upper() == 'ONBUILD':
+        parts = arguments.split(None, 1)
+        if len(parts) != 2:
+            return []
+        command, arguments = parts
+    if command.upper() not in ('RUN', 'COPY', 'ADD'):
+        return []
+    words = _dockerfile_words(arguments)
+    first_argument = 0
+    while first_argument < len(words) and words[first_argument].startswith('--'):
+        first_argument += 1
+    words = words[first_argument:]
+    try:
+        if isinstance(json.loads(' '.join(words)), list):
+            return []
+    except (ValueError, TypeError):
+        pass
+    delimiters = []
+    for word in words:
+        match = re.fullmatch(r'\d*<<(-?)([^<]+)', word)
+        if match is None:
+            continue
+        delimiter = _dockerfile_delimiter(match.group(2))
+        if delimiter is not None:
+            delimiters.append((delimiter, match.group(1) == '-'))
+    return delimiters
+
+
+def _dockerfile_instruction_lines(lines: List[str]):
+    """Skip inline data while retaining each instruction's original location."""
+    escape = '\\'
+    directives = True
+    index = 0
+    while index < len(lines):
+        number = index + 1
+        first = lines[index].rstrip('\r\n')
+        text = first.lstrip()
+        index += 1
+        if directives:
+            directive = re.fullmatch(
+                r'#\s*(syntax|escape|check)\s*=\s*(.+)', text, re.IGNORECASE)
+            if directive:
+                if directive.group(1).lower() == 'escape':
+                    value = directive.group(2).strip()
+                    if value in ('\\', '`'):
+                        escape = value
+                continue
+            directives = False
+        if not text or text.startswith('#'):
+            continue
+        chunks = []
+        while True:
+            trimmed = text.rstrip(' \t')
+            continued = (trimmed.endswith(escape) and
+                         (len(trimmed) == 1 or trimmed[-2] != escape))
+            chunks.append(trimmed[:-1] if continued else text)
+            if not continued or index == len(lines):
+                break
+            # Docker removes comment and blank lines inside continuations.
+            while index < len(lines):
+                text = lines[index].rstrip('\r\n')
+                index += 1
+                if text.strip() and not text.lstrip().startswith('#'):
+                    break
+            else:
+                break
+        yield number, first
+        for delimiter, strip_tabs in _dockerfile_heredocs(''.join(chunks)):
+            while index < len(lines):
+                content = lines[index].rstrip('\r\n')
+                index += 1
+                if strip_tabs:
+                    content = content.lstrip('\t')
+                if content == delimiter:
+                    break
+
+
 def _collect_docker_dependencies(repo_path: Path) -> List[Dict[str, Any]]:
     """收集 Docker 文件中的依赖"""
     dependencies = []
@@ -302,7 +446,10 @@ def _collect_docker_dependencies(repo_path: Path) -> List[Dict[str, Any]]:
             with open(docker_file, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
             
-            for line_num, line in enumerate(lines, 1):
+            instruction_lines = (_dockerfile_instruction_lines(lines)
+                                 if docker_file.name.startswith('Dockerfile')
+                                 else enumerate(lines, 1))
+            for line_num, line in instruction_lines:
                 line = line.strip()
                 
                 # 匹配 FROM 指令
