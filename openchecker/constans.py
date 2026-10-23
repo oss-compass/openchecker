@@ -147,7 +147,8 @@ sonar_scanner_shell_script = """
             -Dsonar.exclusions="$EXCLUSIONS",**/*.java \\
             -Dsonar.scm.disabled=true 2>&1 | tail -n 100 >&2
         
-        scan_exit_code=$?
+        # Read the scanner status, not the status of the log-tail command.
+        scan_exit_code=${{PIPESTATUS[0]}}
         if [ $scan_exit_code -ne 0 ]; then
             echo "通用扫描命令执行失败，退出码: $scan_exit_code" >&2
         fi
@@ -165,7 +166,7 @@ sonar_scanner_shell_script = """
             -Dsonar.projectName="{sonar_project_name}" \\
             -DskipTests 2>&1 | tail -n 50 >&2
         
-        scan_exit_code=$?
+        scan_exit_code=${{PIPESTATUS[0]}}
         handle_scan_result "Maven" $scan_exit_code "$sonar_url"
     }}
     
@@ -183,7 +184,7 @@ sonar_scanner_shell_script = """
                 -Dsonar.projectKey="{sonar_project_name}" \\
                 -Dsonar.projectName="{sonar_project_name}" 2>&1 | tail -n 50 >&2
             
-            scan_exit_code=$?
+            scan_exit_code=${{PIPESTATUS[0]}}
             handle_scan_result "Gradle" $scan_exit_code "$sonar_url"
         else
             echo "项目未配置 SonarQube 插件，回退到通用扫描..." >&2
