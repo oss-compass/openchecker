@@ -261,12 +261,14 @@ The agent manages project source code through a three-phase lifecycle: download,
 
 ### Download Phase
 
-The `_download_project_source` function uses the `download-checkout` shell script template to clone repositories and optionally checkout specific versions:
+The `_download_project_source` function uses the `download-checkout` shell script template to clone repositories and optionally check out a release tag. A supplied `task_metadata.version_number` must identify an existing tag; the checkout uses `refs/tags/<version_number>` so a same-named branch cannot select different source code. An omitted version, JSON `null`, or the `"None"` placeholder leaves the checkout at its current revision (the default branch for a fresh clone).
+
+Cloning, entering the checkout, or checking out the requested tag must succeed before lock-file generation and scanning start. On failure, the agent restores its working directory and rejects the task through the existing dead-letter path; it does not report results for a fallback revision. Checkout does not discard local modifications.
 
 ```
 shell_script = shell_script_handlers["download-checkout"].format(
-    project_url=project_url, 
-    version_number=version_number
+    project_url=quote(project_url),
+    version_number=quote(str(version_number))
 )
 result, error = shell_exec(shell_script)
 ```

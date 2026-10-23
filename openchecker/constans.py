@@ -10,15 +10,14 @@ fi"""
 BASE_SCRIPT = _get_project_name("{project_url}") + "\n" + _clone_project("{project_url}")
 
 download_checkout_shell_script = """
+    set -e
     """ + BASE_SCRIPT + """
     cd "$project_name"
 
-    if [ {version_number} != "None" ]; then
-        if git tag | grep -q "^{version_number}$"; then
-            git checkout "{version_number}" && \\
-            echo "成功切换到标签 {version_number}" || \\
-            echo "切换到标签 {version_number} 失败"
-        fi
+    version_number={version_number}
+    if [ "$version_number" != "None" ]; then
+        git checkout --detach "refs/tags/$version_number"
+        echo "成功切换到标签 $version_number"
     fi
     """
 

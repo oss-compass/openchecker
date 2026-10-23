@@ -15,6 +15,7 @@ import json
 import os
 import re
 from datetime import datetime
+from shlex import quote
 from typing import Any, Dict, List
 
 # Local imports
@@ -283,8 +284,7 @@ def callback_func(ch, method, properties, body):
         }
 
         if not _download_project_source(project_url, version_number):
-            _handle_error_and_nack(ch, method, body, "Failed to download project source")
-            return
+            raise RuntimeError("Failed to download project source")
 
         _generate_lock_files(project_url)
         _execute_commands(command_list, project_url, res_payload, commit_hash, access_token)
@@ -332,8 +332,8 @@ def _download_project_source(project_url: str, version_number: str) -> bool:
     """
     try:
         shell_script = shell_script_handlers["download-checkout"].format(
-            project_url=project_url, 
-            version_number=version_number
+            project_url=quote(project_url),
+            version_number=quote(str(version_number))
         )
         result, error = shell_exec(shell_script)
         
