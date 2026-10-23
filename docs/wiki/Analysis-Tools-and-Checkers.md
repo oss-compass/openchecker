@@ -306,6 +306,16 @@ The supply chain analysis encompasses release content verification, signed relea
 
 ### Release Content Analysis System
 
+Within one `release-checker` call, notes and SBOM checks reuse the file list of
+each successfully parsed source ZIP URL. Empty lists are reused too; failed
+downloads or invalid ZIPs are not stored, so the next content check can try again.
+Only file names are retained until the call returns, using memory proportional
+to their total size across releases; ZIP bytes and open archives are not cached.
+Both checks therefore see the same successful directory snapshot within a call,
+while the next call downloads it again. Direct `check_release_contents` calls
+remain independent unless given an explicit shared `archive_cache`. Release
+metadata is still queried separately for notes, SBOM and signature-file detection.
+
 ```mermaid
 flowchart TD
 

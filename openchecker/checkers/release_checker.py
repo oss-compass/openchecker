@@ -24,7 +24,8 @@ def get_all_releases_with_assets(project_url: str) -> Tuple[List[Dict], str]:
     return platform_manager.get_releases(project_url)
 
 
-def check_release_contents(project_url: str, content_type: str = "notes", check_repo: bool = False) -> Tuple[Dict, str]:
+def check_release_contents(project_url: str, content_type: str = "notes", check_repo: bool = False,
+                           *, archive_cache: dict = None) -> Tuple[Dict, str]:
     """
     Check if all release packages of the specified project contain content files of the specified type.
 
@@ -40,6 +41,7 @@ def check_release_contents(project_url: str, content_type: str = "notes", check_
         project_url (str): Repository address of the project, supports GitHub and Gitee.
         content_type (str): Check type, "notes" or "sbom", default is "notes".
         check_repo (bool): Whether to also check repository source code, default is False.
+        archive_cache (dict): Optional successful archive file lists shared within one scan.
 
     Returns:
         Tuple[Dict, str]: (result_dict, error)
@@ -90,7 +92,7 @@ def check_release_contents(project_url: str, content_type: str = "notes", check_
                 results.append(_create_result_entry(tag, release_name, False, [], "No zipball_url"))
                 continue
             
-            found_files, error_msg = _check_zip_contents(zip_url, file_patterns)
+            found_files, error_msg = _check_zip_contents(zip_url, file_patterns, archive_cache=archive_cache)
             results.append(_create_result_entry(tag, release_name, bool(found_files), found_files, error_msg))
             
         return {"is_released": bool(results), "release_contents": results}, None
@@ -186,13 +188,15 @@ def _get_zipball_url(project_url: str, owner_name: str, repo_name: str, tag: str
     return platform_manager.get_zipball_url(project_url, tag)
 
 
-def _check_zip_contents(zip_url: str, file_patterns: List[str]) -> Tuple[List[str], str]:
+def _check_zip_contents(zip_url: str, file_patterns: List[str],
+                        *, archive_cache: dict = None) -> Tuple[List[str], str]:
     """
     Check contents in zip file.
     
     Args:
         zip_url (str): zip file download URL
         file_patterns (list): List of file matching patterns
+        archive_cache (dict): Optional successful archive file lists shared within one scan.
         
     Returns:
         Tuple[List[str], str]: (found_files, error_msg)
@@ -200,24 +204,32 @@ def _check_zip_contents(zip_url: str, file_patterns: List[str]) -> Tuple[List[st
             error_msg: Error message, None if no error
     """
     try:
-        response = requests.get(zip_url, timeout=30)
-        if response.status_code != 200:
-            return [], f"Failed to download release zip: {response.status_code}"
-        
-        with zipfile.ZipFile(io.BytesIO(response.content), 'r') as zip_ref:
-            found_files = []
-            for file_pattern in file_patterns:
-                if isinstance(file_pattern, str):
-                    for file_name in zip_ref.namelist():
-                        base_name = os.path.basename(file_name).lower()
-                        if base_name == file_pattern.lower():
-                            found_files.append(file_name)
-                else:
-                    for file_name in zip_ref.namelist():
-                        if re.match(file_pattern, file_name):
-                            found_files.append(file_name)
-            
-            return found_files, None
+        file_names = archive_cache.get(zip_url) if archive_cache is not None else None
+        if file_names is None:
+            response = requests.get(zip_url, timeout=30)
+            if response.status_code != 200:
+                return [], f"Failed to download release zip: {response.status_code}"
+
+            with zipfile.ZipFile(io.BytesIO(response.content), 'r') as zip_ref:
+                file_names = zip_ref.namelist()
+            if archive_cache is not None:
+                # Keep only names, not ZIP bytes or open archives. Failures are
+                # not cached, so a later content check can retry the download.
+                archive_cache[zip_url] = file_names
+
+        found_files = []
+        for file_pattern in file_patterns:
+            if isinstance(file_pattern, str):
+                for file_name in file_names:
+                    base_name = os.path.basename(file_name).lower()
+                    if base_name == file_pattern.lower():
+                        found_files.append(file_name)
+            else:
+                for file_name in file_names:
+                    if re.match(file_pattern, file_name):
+                        found_files.append(file_name)
+
+        return found_files, None
             
     except requests.exceptions.Timeout:
         return [], "Download timeout"
@@ -263,8 +275,9 @@ def release_checker(project_url: str, res_payload: dict) -> None:
     res_payload["scan_results"]["release-checker"] = {}
     
     # Check release contents (notes and sbom)
+    archive_cache = {}
     for task in ["notes", "sbom"]:
-        content_check_result, error = check_release_contents(project_url, task)
+        content_check_result, error = check_release_contents(project_url, task, archive_cache=archive_cache)
         if error is None:
             logger.info(f"release-checker {task} job done: {project_url}")
             res_payload["scan_results"]["release-checker"][task] = content_check_result
