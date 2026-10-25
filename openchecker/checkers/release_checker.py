@@ -61,7 +61,7 @@ def check_release_contents(project_url: str, content_type: str = "notes", check_
         if content_type not in ["notes", "sbom"]:
             return {"is_released": False, "release_contents": []}, f"Unsupported type: {content_type}"
         
-        owner_match = re.match(r"https://(?:github|gitee|gitcode).com/([^/]+)/", project_url)
+        owner_match = re.match(r"https://(?:www\.)?(?:github|gitee|gitcode).com/([^/]+)/", project_url)
         if not owner_match:
             return {"is_released": False, "release_contents": []}, "Invalid project URL format"
         
