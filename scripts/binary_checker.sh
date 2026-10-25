@@ -74,7 +74,7 @@ if [ ! -e "$project_name" ]; then
     GIT_ASKPASS=/bin/true git clone --depth=1 $1 > /dev/null 2>&1
 fi
 
-for file in $(find $project_name -type f -not -path '*/.git/*' -not -path '*/test/*')
+while IFS= read -r -d '' file
 do
     if [ ! -e "$file" ]; then
         continue
@@ -88,5 +88,5 @@ do
     elif is_binary "$file"; then
         echo "Binary file found: $file"
     fi
-done
+done < <(find "$project_name" -type f -not -path '*/.git/*' -not -path '*/test/*' -print0)
 # rm -rf $project_name
